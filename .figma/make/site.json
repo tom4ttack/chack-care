@@ -1,0 +1,10 @@
+{
+  "description": "Real-time geofencing alerts and device management enhance safety by preventing loss and aiding quick recovery with anonymous location sharing and disaster mapping.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
