@@ -41,7 +41,7 @@ const SHOP_ITEMS: ShopItem[] = [
 type TabKey = "home" | "live" | "report" | "reward";
 
 const PROTECTED = {
-  name: "김서준",
+  name: "김철수",
   relation: "아들 · 만 7세",
   photo:
     "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=200&h=200&fit=crop&auto=format",
@@ -1639,7 +1639,7 @@ function MenuPage({ page, onClose }: { page: string; onClose: () => void }) {
             <div className="flex items-center gap-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
               <div className="h-20 w-20 shrink-0 rounded-2xl bg-gray-200" />
               <div>
-                <p className="text-lg font-extrabold text-navy">김서준</p>
+                <p className="text-lg font-extrabold text-navy">김철수</p>
                 <p className="text-sm text-gray-500">아들 · 만 7세</p>
                 <p className="mt-1 text-xs text-mint-dark">착코어 A · B 연결됨</p>
               </div>
@@ -1725,7 +1725,7 @@ const NOTIFS: { icon: "alert" | "route" | "gift" | "megaphone"; tone: "coral" | 
   { icon: "route", tone: "coral", title: "평소 경로 이탈 감지", body: "평소 이동 경로를 80% 이상 벗어났습니다.", ts: "5분 전" },
   { icon: "gift", tone: "mint", title: "안심 리워드 적립", body: "실종자 찾기 제보로 +500P가 적립됐어요.", ts: "오늘 14:20" },
   { icon: "megaphone", tone: "coral", title: "실종경보 수신", body: "성동구 실종아동 발생 · 주변 안심 스캔이 켜졌어요.", ts: "오늘 13:02" },
-  { icon: "alert", tone: "mint", title: "안전반경 복귀", body: "김서준 님이 안전반경 안으로 돌아왔어요.", ts: "어제 18:40" },
+  { icon: "alert", tone: "mint", title: "안전반경 복귀", body: "김철수 님이 안전반경 안으로 돌아왔어요.", ts: "어제 18:40" },
 ];
 
 function NotificationPanel({ onClose }: { onClose: () => void }) {
