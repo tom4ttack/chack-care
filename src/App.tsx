@@ -38,7 +38,7 @@ const SHOP_ITEMS: ShopItem[] = [
   { id: "s4", brand: "치킨", name: "후라이드 한 마리", cost: 20000 },
 ];
 
-type TabKey = "home" | "geo" | "map" | "reward";
+type TabKey = "home" | "live" | "report" | "reward";
 
 const PROTECTED = {
   name: "김서준",
@@ -105,7 +105,16 @@ function Icon({
     | "gift"
     | "check"
     | "walk"
-    | "pause";
+    | "pause"
+    | "chart"
+    | "route"
+    | "home2"
+    | "menu"
+    | "bell"
+    | "settings"
+    | "store"
+    | "chevron"
+    | "close";
   className?: string;
 }) {
   const paths: Record<string, React.ReactNode> = {
@@ -216,6 +225,64 @@ function Icon({
         <path d="M15 6v12" />
       </>
     ),
+    chart: (
+      <>
+        <path d="M3 21h18" />
+        <path d="M6.5 21v-6" />
+        <path d="M12 21V8" />
+        <path d="M17.5 21v-9" />
+      </>
+    ),
+    route: (
+      <>
+        <circle cx="6" cy="19" r="2" />
+        <circle cx="18" cy="5" r="2" />
+        <path d="M8 19h6.5a3 3 0 0 0 0-6h-5a3 3 0 0 1 0-6H16" />
+      </>
+    ),
+    home2: (
+      <>
+        <path d="M4 11 12 4l8 7" />
+        <path d="M6 10v10h12V10" />
+      </>
+    ),
+    menu: (
+      <>
+        <path d="M4 7h16" />
+        <path d="M4 12h16" />
+        <path d="M4 17h16" />
+      </>
+    ),
+    bell: (
+      <>
+        <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" />
+        <path d="M10 19a2 2 0 0 0 4 0" />
+      </>
+    ),
+    settings: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" />
+      </>
+    ),
+    store: (
+      <>
+        <path d="M4 9h16l-1-4H5L4 9Z" />
+        <path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9" />
+        <path d="M10 20v-5h4v5" />
+      </>
+    ),
+    chevron: (
+      <>
+        <path d="M9 6l6 6-6 6" />
+      </>
+    ),
+    close: (
+      <>
+        <path d="M6 6l12 12" />
+        <path d="M18 6 6 18" />
+      </>
+    ),
   };
   return (
     <svg
@@ -238,7 +305,7 @@ function Icon({
 
 function BatteryBar({ level }: { level: number }) {
   const color =
-    level > 50 ? "bg-mint" : level > 20 ? "bg-amber-400" : "bg-coral";
+    level > 50 ? "bg-mint" : level > 20 ? "bg-[#F2BE55]" : "bg-coral";
   return (
     <div className="flex items-center gap-2">
       <div className="relative h-3.5 w-7 rounded-[3px] border-[1.5px] border-gray-500/60">
@@ -430,7 +497,7 @@ function HomeScreen({
           </div>
           <div>
             <p className="text-sm font-medium opacity-90">
-              {PROTECTED.name} · {PROTECTED.relation}
+              김철수 · 부 · 만 74세
             </p>
             <p className="text-2xl font-extrabold tracking-tight">
               {safe ? "안심 · 반경 내" : "이탈 감지"}
@@ -453,21 +520,21 @@ function HomeScreen({
       </div>
 
       {/* 빠른 실행 */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2.5">
         {[
-          { t: "지오펜스", i: "signal" as const, tab: "geo" as TabKey },
-          { t: "탐색 지도", i: "map" as const, tab: "map" as TabKey },
+          { t: "라이브 지도", i: "map" as const, tab: "live" as TabKey },
+          { t: "활동 리포트", i: "chart" as const, tab: "report" as TabKey },
           { t: "안심 리워드", i: "wallet" as const, tab: "reward" as TabKey },
         ].map((q) => (
           <button
             key={q.t}
             onClick={() => onGo(q.tab)}
-            className="flex flex-col items-center gap-2 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 transition active:scale-95"
+            className="flex flex-col items-center gap-1.5 rounded-2xl bg-white p-2.5 shadow-sm ring-1 ring-gray-100 transition active:scale-95"
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-light text-mint-dark">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-mint-light text-mint-dark">
               <Icon name={q.i} className="h-5 w-5" />
             </span>
-            <span className="text-[11px] font-semibold text-gray-700">
+            <span className="text-[10px] font-semibold text-gray-700">
               {q.t}
             </span>
           </button>
@@ -524,18 +591,22 @@ function HomeScreen({
    1) 지오펜스
    ============================================================ */
 
-function GeofenceScreen({
+function LiveMapScreen({
   radius,
   setRadius,
   cores,
   setCores,
   onTriggerAlert,
+  relayOn,
+  setRelayOn,
 }: {
   radius: number;
   setRadius: (r: number) => void;
   cores: Core[];
   setCores: React.Dispatch<React.SetStateAction<Core[]>>;
   onTriggerAlert: (core: Core, distance: number) => void;
+  relayOn: boolean;
+  setRelayOn: (v: boolean) => void;
 }) {
   const monitored = cores.filter((c) => c.connected && c.monitoring);
   const monitoringOn = monitored.length > 0;
@@ -624,28 +695,54 @@ function GeofenceScreen({
       </div>
 
       <SectionTitle
-        title="지오펜싱 안전반경"
+        title="라이브 지도"
         sub={monitoringOn ? (inside ? "반경 내" : "이탈") : "꺼짐"}
       />
 
-      {/* 레이더 뷰 */}
-      <div
-        className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-3xl transition-colors ${fieldBg}`}
-      >
-        {[1, 0.66, 0.33].map((r) => (
-          <div
-            key={r}
-            className={`absolute rounded-full border ${ringColor}`}
-            style={{ width: `${r * 88}%`, height: `${r * 88}%` }}
+      {/* 재난문자 배너 (안심 스캔 ON 일 때만) */}
+      {relayOn && (
+        <div className="animate-siren rounded-2xl px-4 py-3 text-white">
+          <div className="flex items-start gap-2.5">
+            <Icon name="megaphone" className="mt-0.5 h-5 w-5 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-extrabold">
+                [실종경보] 성동구 실종아동 발생
+              </p>
+              <p className="text-xs opacity-90">
+                7세 남아 · 파란 점퍼 · 성수동 인근 · 15:42 최종 확인
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 통합 지도: 내 비콘 + (스캔 시) 주변 비콘 동시 표시 */}
+      <div className="relative aspect-square overflow-hidden rounded-3xl ring-1 ring-gray-200">
+        <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full">
+          <rect width="400" height="400" fill="#EEF7F6" />
+          {[70, 150, 230, 310].map((y) => (
+            <line key={`h${y}`} x1="0" y1={y} x2="400" y2={y} stroke="#D9ECEA" strokeWidth="9" />
+          ))}
+          {[60, 150, 250, 340].map((x) => (
+            <line key={`v${x}`} x1={x} y1="0" x2={x} y2="400" stroke="#D9ECEA" strokeWidth="9" />
+          ))}
+          {/* 내 안전반경 (지오펜스) */}
+          <circle
+            cx="200"
+            cy="210"
+            r={radius === 15 ? 78 : 118}
+            fill={breach ? "#F0706016" : "#2A9D8F14"}
+            stroke={breach ? "#F07060" : "#2A9D8F"}
+            strokeWidth="2"
+            strokeDasharray="7 6"
           />
-        ))}
+        </svg>
+
+        {/* 내 비콘 (중심) */}
         <div
-          className={`absolute rounded-full border-2 border-dashed ${
-            breach ? "border-coral" : safe ? "border-mint" : "border-gray-300"
-          }`}
-          style={{ width: "58%", height: "58%" }}
-        />
-        <div className="absolute flex h-12 w-12 items-center justify-center rounded-full bg-white text-navy shadow-md">
+          className="absolute flex h-11 w-11 items-center justify-center rounded-full bg-white text-navy shadow-md"
+          style={{ left: "50%", top: "52.5%", transform: "translate(-50%,-50%)" }}
+        >
           <Icon name="phone" className="h-5 w-5" />
           {monitoringOn && (
             <span
@@ -655,9 +752,15 @@ function GeofenceScreen({
             />
           )}
         </div>
+
+        {/* 대상자(내 비콘 연동) 위치 */}
         <div
           className="absolute transition-all duration-700 ease-out"
-          style={{ transform: `translate(${pct * 120}px, ${-pct * 70}px)` }}
+          style={{
+            left: "50%",
+            top: "52.5%",
+            transform: `translate(calc(-50% + ${pct * 110}px), calc(-50% - ${pct * 70}px))`,
+          }}
         >
           <div
             className={`flex h-9 w-9 items-center justify-center rounded-full text-white shadow-lg ${markColor}`}
@@ -666,9 +769,24 @@ function GeofenceScreen({
           </div>
         </div>
 
+        {/* 주변 비콘 신호 (안심 스캔 ON) */}
+        {relayOn &&
+          [
+            { l: "26%", t: "30%" },
+            { l: "72%", t: "40%" },
+            { l: "64%", t: "74%" },
+            { l: "33%", t: "70%" },
+          ].map((p, i) => (
+            <div
+              key={i}
+              className="animate-scan absolute h-3 w-3 rounded-full bg-coral ring-4 ring-coral/25"
+              style={{ left: p.l, top: p.t, animationDelay: `${i * 0.35}s` }}
+            />
+          ))}
+
         {/* 추정 거리 */}
-        <div className="absolute bottom-4 left-4 rounded-2xl bg-white/85 px-3 py-2 backdrop-blur">
-          <p className="text-[11px] font-semibold text-gray-500">추정 거리</p>
+        <div className="absolute bottom-3 left-3 rounded-2xl bg-white/85 px-3 py-2 backdrop-blur">
+          <p className="text-[11px] font-semibold text-gray-500">내 비콘 거리</p>
           <p
             className={`text-2xl font-extrabold tabular-nums ${
               breach ? "text-coral-dark" : "text-navy"
@@ -680,7 +798,7 @@ function GeofenceScreen({
         </div>
 
         {/* 움직임 상태 */}
-        <div className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1.5 backdrop-blur">
+        <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1.5 backdrop-blur">
           <Icon
             name={walking ? "walk" : "pause"}
             className={`h-4 w-4 ${walking ? "text-mint-dark" : "text-gray-400"}`}
@@ -693,6 +811,49 @@ function GeofenceScreen({
             {walking ? "걷는 중" : "정지 상태"}
           </span>
         </div>
+
+        {/* 범례 */}
+        <div className="absolute bottom-3 right-3 space-y-1 rounded-2xl bg-white/85 px-3 py-2 text-[10px] backdrop-blur">
+          <p className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-mint" /> 내 비콘
+          </p>
+          {relayOn && (
+            <p className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-coral" /> 주변 실종 비콘
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* 주변 안심 스캔 토글 */}
+      <div className="flex items-center gap-3 rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100">
+        <span
+          className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
+            relayOn ? "bg-coral-light text-coral-dark" : "bg-gray-100 text-gray-400"
+          }`}
+        >
+          <Icon name="broadcast" className="h-5 w-5" />
+        </span>
+        <div className="flex-1">
+          <p className="text-sm font-bold text-navy">주변 안심 스캔</p>
+          <p className="text-xs text-gray-500">
+            {relayOn
+              ? "주변 실종 비콘까지 함께 감지하고 있어요"
+              : "내 비콘만 표시 중 · 켜면 주변도 함께 감지"}
+          </p>
+        </div>
+        <button
+          onClick={() => setRelayOn(!relayOn)}
+          className={`relative h-7 w-12 rounded-full transition-colors ${
+            relayOn ? "bg-mint" : "bg-gray-200"
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${
+              relayOn ? "left-[22px]" : "left-0.5"
+            }`}
+          />
+        </button>
       </div>
 
       {/* 반경 선택 */}
@@ -794,144 +955,377 @@ function GeofenceScreen({
 }
 
 /* ============================================================
-   2) 재난문자 연동 탐색 지도
+   1.5) 활동 리포트 (생활 패턴 분석 결과)
    ============================================================ */
 
-function MapScreen({ relayOn }: { relayOn: boolean }) {
-  const [alertActive, setAlertActive] = useState(true);
-  return (
-    <div className="space-y-5">
-      <SectionTitle title="실시간 탐색 지도" sub="재난문자 연동" />
+type Place = {
+  name: string;
+  desc: string;
+  freq: number; // 0~100 상대 빈도
+  icon: "home2" | "pin";
+};
 
-      {alertActive && (
-        <div className="animate-siren rounded-2xl px-4 py-3 text-white">
-          <div className="flex items-start gap-2.5">
-            <Icon name="megaphone" className="mt-0.5 h-5 w-5 shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-extrabold">
-                [실종경보] 성동구 실종아동 발생
+const PLACES: Place[] = [
+  { name: "집", desc: "매일 · 하루 평균 20시간", freq: 100, icon: "home2" },
+  { name: "경로당", desc: "평일 · 오후 2–5시", freq: 74, icon: "pin" },
+  { name: "서울숲 산책로", desc: "주 4회 · 오전", freq: 58, icon: "pin" },
+  { name: "재래시장", desc: "주 2회 · 오전", freq: 34, icon: "pin" },
+];
+
+// 방문 거점 3단계: core=생활 거점, peripheral=행동반경 근처 낯선 곳, rare=반경 밖 낯선 곳
+// SVG viewBox 400×400, 전체 행동반경 원: cx=200 cy=205 r=150
+const ACTIVITY_CLUSTERS: { x: number; y: number; r: number; tier: "core" | "peripheral" | "rare" }[] = [
+  { x: 200, y: 205, r: 42, tier: "core" },    // 집 (중심)
+  { x: 300, y: 150, r: 30, tier: "core" },    // 경로당 (반경 내 자주)
+  { x: 120, y: 120, r: 26, tier: "peripheral" }, // 산책로 (반경 경계, 친숙)
+  { x: 150, y: 300, r: 22, tier: "peripheral" }, // 재래시장 (반경 내 가끔)
+  { x: 358, y: 318, r: 18, tier: "rare" },    // 병원 (반경 밖, 낯선 곳)
+  { x: 52,  y: 326, r: 16, tier: "rare" },    // 마트 (반경 밖, 낯선 곳)
+];
+
+// 방문 신호 기록 점 — 3단계 색 구분
+const ACTIVITY_DOTS: { x: number; y: number; tier: "core" | "peripheral" | "rare" }[] = [
+  // 생활 거점 (집·경로당 주변)
+  { x: 48, y: 50, tier: "core" }, { x: 52, y: 46, tier: "core" },
+  { x: 45, y: 54, tier: "core" }, { x: 55, y: 52, tier: "core" },
+  { x: 50, y: 48, tier: "core" }, { x: 53, y: 55, tier: "core" },
+  { x: 72, y: 36, tier: "core" }, { x: 76, y: 40, tier: "core" },
+  { x: 68, y: 39, tier: "core" }, { x: 74, y: 33, tier: "core" },
+  { x: 70, y: 38, tier: "core" }, { x: 73, y: 42, tier: "core" },
+  // 행동반경 근처·친숙 (amber — 산책로·재래시장 주변)
+  { x: 28, y: 28, tier: "peripheral" }, { x: 32, y: 32, tier: "peripheral" },
+  { x: 26, y: 33, tier: "peripheral" }, { x: 30, y: 26, tier: "peripheral" },
+  { x: 36, y: 74, tier: "peripheral" }, { x: 40, y: 78, tier: "peripheral" },
+  { x: 33, y: 72, tier: "peripheral" }, { x: 38, y: 76, tier: "peripheral" },
+  { x: 60, y: 40, tier: "peripheral" }, { x: 42, y: 62, tier: "peripheral" },
+  { x: 58, y: 62, tier: "peripheral" }, { x: 50, y: 66, tier: "peripheral" },
+  // 반경 밖 낯선 곳 (coral — 병원·마트 주변, 원 바깥)
+  { x: 88, y: 79, tier: "rare" }, { x: 91, y: 82, tier: "rare" },
+  { x: 86, y: 76, tier: "rare" }, { x: 89, y: 84, tier: "rare" },
+  { x: 12, y: 80, tier: "rare" }, { x: 15, y: 83, tier: "rare" },
+  { x: 10, y: 77, tier: "rare" }, { x: 13, y: 85, tier: "rare" },
+];
+
+type Segment = { label: string; from: number; to: number; out: boolean };
+
+const DAY_PATTERN: Record<"weekday" | "weekend", Segment[]> = {
+  weekday: [
+    { label: "집", from: 0, to: 9, out: false },
+    { label: "산책", from: 9, to: 11, out: true },
+    { label: "집", from: 11, to: 14, out: false },
+    { label: "경로당", from: 14, to: 17, out: true },
+    { label: "집", from: 17, to: 24, out: false },
+  ],
+  weekend: [
+    { label: "집", from: 0, to: 10, out: false },
+    { label: "공원", from: 10, to: 13, out: true },
+    { label: "집", from: 13, to: 24, out: false },
+  ],
+};
+
+function PatternAlertModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    try {
+      navigator.vibrate?.([300, 150, 300]);
+    } catch {}
+  }, []);
+  return (
+    <div className="absolute inset-0 z-50 flex items-end justify-center bg-navy/60 backdrop-blur-sm">
+      <div className="animate-slide-up w-full overflow-hidden rounded-t-3xl bg-white">
+        <div className="animate-siren px-6 py-5 text-white">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20">
+              <Icon name="route" className="h-6 w-6" />
+            </span>
+            <div>
+              <p className="text-lg font-extrabold leading-tight">
+                평소 경로 이탈 감지
               </p>
-              <p className="text-xs opacity-90">
-                7세 남아 · 파란 점퍼 · 성수동 인근 · 15:42 최종 확인
-              </p>
+              <p className="text-sm opacity-90">{PROTECTED.name}</p>
             </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 px-6 pb-8 pt-5">
+          <p className="text-center text-xl font-extrabold text-navy">
+            평소 이동 경로를<br />
+            <span className="text-coral-dark">80% 이상</span> 벗어났습니다
+          </p>
+          <p className="rounded-2xl bg-coral-light px-4 py-3 text-center text-[13px] leading-relaxed text-coral-dark">
+            평소 가지 않던 방향으로 이동하고 있어요. 위치를 확인해 주세요.
+          </p>
+          <div className="flex gap-3">
             <button
-              onClick={() => setAlertActive(false)}
-              className="text-xs font-bold opacity-80"
+              onClick={onClose}
+              className="flex-1 rounded-2xl bg-gray-100 py-3.5 text-sm font-bold text-gray-700 transition active:scale-[.98]"
             >
-              닫기
+              해제
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-2xl bg-coral py-3.5 text-sm font-bold text-white shadow-lg shadow-coral/30 transition active:scale-[.98]"
+            >
+              위치 확인
             </button>
           </div>
-        </div>
-      )}
-
-      <div className="relative aspect-[4/5] overflow-hidden rounded-3xl bg-gray-100 ring-1 ring-gray-200">
-        <svg viewBox="0 0 400 500" className="absolute inset-0 h-full w-full">
-          <rect width="400" height="500" fill="#EEF7F6" />
-          {[80, 160, 240, 320].map((y) => (
-            <line
-              key={`h${y}`}
-              x1="0"
-              y1={y}
-              x2="400"
-              y2={y}
-              stroke="#D4E8E6"
-              strokeWidth="10"
-            />
-          ))}
-          {[70, 160, 250, 340].map((x) => (
-            <line
-              key={`v${x}`}
-              x1={x}
-              y1="0"
-              x2={x}
-              y2="500"
-              stroke="#D4E8E6"
-              strokeWidth="10"
-            />
-          ))}
-          <circle
-            cx="210"
-            cy="240"
-            r="150"
-            fill="#F0706018"
-            stroke="#F07060"
-            strokeWidth="2"
-            strokeDasharray="8 6"
-          />
-          <circle
-            cx="210"
-            cy="240"
-            r="90"
-            fill="#F0706022"
-            stroke="#F07060"
-            strokeWidth="1.5"
-            strokeDasharray="5 5"
-          />
-        </svg>
-
-        <div
-          className="absolute"
-          style={{
-            left: "52.5%",
-            top: "48%",
-            transform: "translate(-50%,-50%)",
-          }}
-        >
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-coral text-white shadow-lg">
-            <Icon name="person" className="h-5 w-5" />
-            <span className="animate-pulse-ring absolute h-full w-full rounded-full bg-coral/40" />
-          </div>
-        </div>
-
-        {[
-          { l: "30%", t: "35%" },
-          { l: "70%", t: "60%" },
-          { l: "40%", t: "68%" },
-        ].map((p, i) => (
-          <div
-            key={i}
-            className="animate-scan absolute h-3 w-3 rounded-full bg-mint ring-4 ring-mint/25"
-            style={{ left: p.l, top: p.t, animationDelay: `${i * 0.4}s` }}
-          />
-        ))}
-
-        <div className="absolute bottom-3 left-3 space-y-1.5 rounded-2xl bg-white/90 px-3 py-2.5 text-[11px] backdrop-blur">
-          <p className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-coral" /> 최종 확인 위치
-          </p>
-          <p className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-mint" /> 익명 제보
-          </p>
-          <p className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full border-2 border-coral" />{" "}
-            예상 이동 반경
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100">
-        <span
-          className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-            relayOn ? "bg-mint-light text-mint-dark" : "bg-gray-100 text-gray-400"
-          }`}
-        >
-          <Icon name="broadcast" className="h-5 w-5" />
-        </span>
-        <div className="flex-1">
-          <p className="text-sm font-bold text-navy">
-            내 기기 안심 스캔 {relayOn ? "참여 중" : "대기"}
-          </p>
-          <p className="text-xs text-gray-500">
-            {relayOn
-              ? "실종자 찾기에 함께하고 있어요"
-              : "리워드 탭에서 켤 수 있어요"}
-          </p>
         </div>
       </div>
     </div>
   );
 }
+
+function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
+  const [day, setDay] = useState<"weekday" | "weekend">("weekday");
+  const segments = DAY_PATTERN[day];
+  const nowHour = 15.3; // 데모 현재 시각
+
+  return (
+    <div className="space-y-5">
+      <SectionTitle title="활동 리포트" sub="최근 14일 분석" />
+
+      {/* 요약 카드 */}
+      <div className="relative overflow-hidden rounded-3xl bg-mint p-6 text-white">
+        <div className="absolute -right-8 -top-8 h-36 w-36 rounded-full bg-white/10" />
+        <div className="relative flex items-center gap-3">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
+            <Icon name="chart" className="h-6 w-6" />
+          </span>
+          <div>
+            <p className="text-sm opacity-90">오늘의 생활 패턴</p>
+            <p className="text-xl font-extrabold">평소와 비슷해요</p>
+          </div>
+        </div>
+        <p className="relative mt-4 text-[13px] leading-relaxed opacity-90">
+          김철수님은 평소 생활 리듬을 안정적으로 유지하고 있어요.
+          자주 가는 곳과 이동 경로를 학습해 이상 징후를 미리 살펴봐요.
+        </p>
+      </div>
+
+      {/* 행동반경 지도 — 주변 신호 기록으로 그린 생활 지도 */}
+      <div>
+        <SectionTitle title="행동반경 지도" sub="최근 14일 방문 기록" />
+        <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
+          <div className="relative aspect-square">
+            <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full">
+              <rect width="400" height="400" fill="#EEF7F6" />
+              {[70, 150, 230, 310].map((y) => (
+                <line key={`h${y}`} x1="0" y1={y} x2="400" y2={y} stroke="#DCEEEC" strokeWidth="8" />
+              ))}
+              {[60, 150, 250, 340].map((x) => (
+                <line key={`v${x}`} x1={x} y1="0" x2={x} y2="400" stroke="#DCEEEC" strokeWidth="8" />
+              ))}
+
+              {/* 전체 행동반경 */}
+              <circle cx="200" cy="205" r="150" fill="#2A9D8F10" stroke="#2A9D8F" strokeWidth="2" strokeDasharray="7 6" />
+
+              {/* 방문 신호 밀집 구역 — 3단계 색 */}
+              {ACTIVITY_CLUSTERS.map((c, i) => {
+                const [outer, inner] =
+                  c.tier === "core"
+                    ? ["#2A9D8F33", "#2A9D8F55"]
+                    : c.tier === "peripheral"
+                    ? ["#F2BE5522", "#F2BE5540"]
+                    : ["#F0706026", "#F0706048"];
+                return (
+                  <g key={i}>
+                    <circle cx={c.x} cy={c.y} r={c.r} fill={outer} />
+                    <circle cx={c.x} cy={c.y} r={c.r * 0.55} fill={inner} />
+                  </g>
+                );
+              })}
+
+            </svg>
+
+            {/* 신호 기록 점들 — 3단계 색 */}
+            {ACTIVITY_DOTS.map((d, i) => (
+              <span
+                key={i}
+                className={`absolute rounded-full ${
+                  d.tier === "core"
+                    ? "h-2 w-2 bg-mint/70"
+                    : d.tier === "peripheral"
+                    ? "h-1.5 w-1.5 bg-[#F2BE55]/80"
+                    : "h-1.5 w-1.5 bg-coral/75"
+                }`}
+                style={{ left: `${d.x}%`, top: `${d.y}%` }}
+              />
+            ))}
+
+            {/* 장소 핀 — 3단계 색 */}
+            {ACTIVITY_CLUSTERS.map((c, i) => {
+              const bg =
+                c.tier === "core"
+                  ? "bg-mint"
+                  : c.tier === "peripheral"
+                  ? "bg-[#F2BE55]"
+                  : "bg-coral";
+              const icon = c.tier === "core" ? "home2" : "pin";
+              return (
+                <div
+                  key={i}
+                  className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+                  style={{ left: `${(c.x / 400) * 100}%`, top: `${(c.y / 400) * 100}%` }}
+                >
+                  <span
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-white shadow-md ${bg}`}
+                  >
+                    <Icon name={icon} className="h-4 w-4" />
+                  </span>
+                </div>
+              );
+            })}
+
+            {/* 반경 라벨 */}
+            <div className="absolute left-3 top-3 rounded-2xl bg-white/85 px-3 py-2 backdrop-blur">
+              <p className="text-[11px] font-semibold text-gray-500">평소 행동반경</p>
+              <p className="text-2xl font-extrabold tabular-nums text-navy">
+                1.2<span className="text-sm">km</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-[11px]">
+            <span className="flex items-center gap-1.5 text-gray-500">
+              <span className="h-2.5 w-2.5 rounded-full bg-mint" /> 생활 거점
+            </span>
+            <span className="flex items-center gap-1.5 text-gray-500">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#F2BE55]" /> 반경 근처
+            </span>
+            <span className="flex items-center gap-1.5 text-gray-500">
+              <span className="h-2.5 w-2.5 rounded-full bg-coral" /> 반경 밖
+            </span>
+          </div>
+        </div>
+        <p className="mt-2 px-1 text-[11px] leading-relaxed text-gray-400">
+          주변 기기 신호를 안전하게 수집해 자주 지나는 위치를 지도에 기록하고, 이를 바탕으로 평소 생활 반경을 그려요.
+        </p>
+      </div>
+
+      {/* 자주 머무는 장소 */}
+      <div>
+        <SectionTitle title="자주 머무는 곳" sub="자동 분석" />
+        <div className="space-y-2.5">
+          {PLACES.map((p) => (
+            <div
+              key={p.name}
+              className="rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100"
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-light text-mint-dark">
+                  <Icon name={p.icon} className="h-5 w-5" />
+                </span>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-navy">{p.name}</p>
+                  <p className="text-xs text-gray-500">{p.desc}</p>
+                </div>
+                <span className="text-xs font-bold tabular-nums text-mint-dark">
+                  {p.freq}%
+                </span>
+              </div>
+              <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+                <div
+                  className="h-full rounded-full bg-mint transition-all"
+                  style={{ width: `${p.freq}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 시간대별 안전 구역 (동적 지오펜스) */}
+      <div>
+        <SectionTitle title="시간대별 안전 구역" sub="자동 설정" />
+        <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+          <div className="mb-3 flex rounded-xl bg-gray-100 p-1">
+            {(["weekday", "weekend"] as const).map((d) => (
+              <button
+                key={d}
+                onClick={() => setDay(d)}
+                className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+                  day === d ? "bg-white text-mint-dark shadow-sm" : "text-gray-500"
+                }`}
+              >
+                {d === "weekday" ? "평일" : "주말"}
+              </button>
+            ))}
+          </div>
+
+          {/* 24시간 타임라인 */}
+          <div className="relative">
+            <div className="flex h-9 w-full overflow-hidden rounded-lg">
+              {segments.map((s, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center justify-center text-[10px] font-bold ${
+                    s.out
+                      ? "bg-coral-light text-coral-dark"
+                      : "bg-mint-light text-mint-dark"
+                  }`}
+                  style={{ width: `${((s.to - s.from) / 24) * 100}%` }}
+                >
+                  {s.to - s.from >= 3 ? s.label : ""}
+                </div>
+              ))}
+            </div>
+            {/* 현재 시각 마커 */}
+            <div
+              className="absolute -top-1 bottom-0 w-0.5 bg-navy"
+              style={{ left: `${(nowHour / 24) * 100}%` }}
+            >
+              <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-navy" />
+            </div>
+          </div>
+          <div className="mt-1.5 flex justify-between text-[10px] text-gray-400">
+            <span>0시</span>
+            <span>6시</span>
+            <span>12시</span>
+            <span>18시</span>
+            <span>24시</span>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2 rounded-xl bg-mint-light px-3 py-2.5 text-mint-dark">
+            <Icon name="signal" className="h-4 w-4 shrink-0" />
+            <p className="text-xs font-semibold">
+              지금 시간대 평소 활동 반경: 약 350m 이내
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 이상 패턴 선제 경보 */}
+      <div>
+        <SectionTitle title="평소 경로 이탈 경보" sub="선제 알림" />
+        <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-coral-light text-coral-dark">
+              <Icon name="route" className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-sm font-bold text-navy">
+                평소와 다른 이동을 미리 알려드려요
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                평소 가지 않던 방향이나 이례적인 시간대로 이동하면, 재난문자보다
+                먼저 보호자에게 선제적으로 알림을 보냅니다.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onPreviewAlert}
+            className="mt-3 w-full rounded-xl bg-navy py-2.5 text-sm font-bold text-white transition active:scale-[.98]"
+          >
+            선제 경보 미리보기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   2) 재난문자 연동 탐색 지도
+   ============================================================ */
 
 /* ============================================================
    3) 안심 리워드 (P2P 릴레이 지갑)
@@ -953,12 +1347,25 @@ function RewardScreen({
   onRedeem: (item: ShopItem) => void;
 }) {
   const [purchased, setPurchased] = useState<ShopItem | null>(null);
+  const [hours, setHours] = useState(4.5); // 1365 연계 누적 봉사시간
+  const [synced, setSynced] = useState(false);
+
+  const CONVERT_COST = 1000; // 1,000P = 30분
+  const canConvert = points >= CONVERT_COST;
 
   function buy(item: ShopItem) {
     if (points < item.cost) return;
     onRedeem(item);
     setPurchased(item);
     setTimeout(() => setPurchased(null), 2200);
+  }
+
+  function convertToHours() {
+    if (!canConvert) return;
+    onRedeem({ id: "vol", brand: "1365", name: "봉사시간 전환", cost: CONVERT_COST });
+    setHours((h) => Math.round((h + 0.5) * 10) / 10);
+    setSynced(true);
+    setTimeout(() => setSynced(false), 2200);
   }
 
   return (
@@ -1041,6 +1448,56 @@ function RewardScreen({
         </button>
       </div>
 
+      {/* 1365 자원봉사 연계 */}
+      <div>
+        <SectionTitle title="봉사시간 적립" sub="1365 자원봉사포털 연계" />
+        <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
+          <div className="flex items-center gap-3 bg-mint px-5 py-4 text-white">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15">
+              <Icon name="check" className="h-5 w-5" />
+            </span>
+            <div className="flex-1">
+              <p className="text-xs opacity-80">1365 누적 봉사시간</p>
+              <p className="text-2xl font-extrabold tabular-nums">
+                {hours.toFixed(1)}<span className="ml-0.5 text-sm">시간</span>
+              </p>
+            </div>
+            <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
+              계정 연동됨
+            </span>
+          </div>
+
+          <div className="p-4">
+            <div className="flex items-start gap-2.5 rounded-2xl bg-mint-light px-3.5 py-3 text-mint-dark">
+              <Icon name="broadcast" className="mt-0.5 h-4 w-4 shrink-0" />
+              <p className="text-xs leading-relaxed">
+                안심 스캔으로 실종자 찾기에 참여하면 활동이 봉사활동으로 인정돼요.
+                1,000P를 30분 봉사시간으로 전환해 1365 실적에 자동 반영합니다.
+              </p>
+            </div>
+
+            {synced && (
+              <div className="animate-fade-in mt-3 flex items-center gap-2 rounded-xl bg-navy px-3 py-2.5 text-white">
+                <Icon name="check" className="h-4 w-4 shrink-0" />
+                <p className="text-xs font-semibold">
+                  30분이 1365 봉사실적으로 전송됐어요
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={convertToHours}
+              disabled={!canConvert}
+              className={`mt-3 w-full rounded-xl py-2.5 text-sm font-bold transition active:scale-[.98] ${
+                canConvert ? "bg-navy text-white" : "bg-gray-100 text-gray-400"
+              }`}
+            >
+              {canConvert ? "1,000P → 봉사시간 30분 전환" : "포인트 부족 (1,000P 필요)"}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* 기프티콘 상점 */}
       <div>
         <SectionTitle title="리워드 상점" sub="포인트로 교환" />
@@ -1111,17 +1568,217 @@ function RewardScreen({
 }
 
 /* ============================================================
+   상단바: 메뉴 드로어 · 메뉴 상세 · 알림 패널
+   ============================================================ */
+
+const MENU_ITEMS: { key: string; label: string; sub: string; icon: "person" | "home2" | "settings" | "store" }[] = [
+  { key: "프로필", label: "프로필", sub: "보호 대상 · 착코어 정보", icon: "person" },
+  { key: "마이페이지", label: "마이페이지", sub: "구독 · 리워드 · 주문 내역", icon: "home2" },
+  { key: "간단한 설정", label: "간단한 설정", sub: "알림 · 안전반경 · 개인정보", icon: "settings" },
+  { key: "자사몰", label: "자사몰", sub: "착코어 · 액세서리 구매", icon: "store" },
+];
+
+function Drawer({
+  onClose,
+  onOpenPage,
+}: {
+  onClose: () => void;
+  onOpenPage: (page: string) => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-40 flex">
+      <div className="animate-fade-in absolute inset-0 bg-navy/30" onClick={onClose} />
+      <div className="animate-slide-up relative flex h-full w-[80%] max-w-[320px] flex-col bg-white shadow-2xl">
+        <div className="flex items-center gap-3 border-b border-gray-100 bg-mint-light px-5 py-6">
+          <div className="h-14 w-14 rounded-full bg-gray-200" />
+          <div>
+            <p className="text-base font-extrabold text-navy">김보호 님</p>
+            <p className="text-xs text-gray-500">프리미엄 케어 구독 중</p>
+          </div>
+        </div>
+        <nav className="flex-1 overflow-y-auto p-3">
+          {MENU_ITEMS.map((m) => (
+            <button
+              key={m.key}
+              onClick={() => onOpenPage(m.key)}
+              className="flex w-full items-center gap-3.5 rounded-2xl px-3 py-3.5 text-left transition active:bg-gray-100"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-mint-light text-mint-dark">
+                <Icon name={m.icon} className="h-5 w-5" />
+              </span>
+              <span className="flex-1">
+                <span className="block text-sm font-bold text-navy">{m.label}</span>
+                <span className="block text-xs text-gray-500">{m.sub}</span>
+              </span>
+              <Icon name="chevron" className="h-4 w-4 text-gray-300" />
+            </button>
+          ))}
+        </nav>
+        <p className="px-5 py-4 text-[11px] text-gray-400">ChakCare v1.0.0</p>
+      </div>
+    </div>
+  );
+}
+
+function MenuPage({ page, onClose }: { page: string; onClose: () => void }) {
+  const meta = MENU_ITEMS.find((m) => m.key === page);
+  return (
+    <div className="animate-fade-in absolute inset-0 z-50 flex flex-col bg-gray-50">
+      <header className="flex items-center gap-3 border-b border-gray-100 bg-white/90 px-4 py-3.5 backdrop-blur">
+        <button
+          onClick={onClose}
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-navy transition active:scale-90 active:bg-gray-100"
+        >
+          <Icon name="chevron" className="h-6 w-6 rotate-180" />
+        </button>
+        <p className="text-base font-extrabold text-navy">{page}</p>
+      </header>
+      <div className="flex-1 overflow-y-auto p-5">
+        {page === "프로필" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
+              <div className="h-20 w-20 shrink-0 rounded-2xl bg-gray-200" />
+              <div>
+                <p className="text-lg font-extrabold text-navy">김서준</p>
+                <p className="text-sm text-gray-500">아들 · 만 7세</p>
+                <p className="mt-1 text-xs text-mint-dark">착코어 A · B 연결됨</p>
+              </div>
+            </div>
+            {[
+              ["보호자", "김보호 (엄마)"],
+              ["비상 연락처", "010-1234-5678"],
+              ["기본 안전반경", "30m"],
+              ["특이사항", "파란 점퍼 착용"],
+            ].map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm ring-1 ring-gray-100">
+                <span className="text-sm text-gray-500">{k}</span>
+                <span className="text-sm font-bold text-navy">{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {page === "마이페이지" && (
+          <div className="space-y-4">
+            <div className="rounded-3xl bg-mint p-5 text-white shadow-sm">
+              <p className="text-xs opacity-80">보유 포인트</p>
+              <p className="text-3xl font-extrabold tabular-nums">3,500P</p>
+            </div>
+            {[
+              ["구독 상태", "프리미엄 케어"],
+              ["다음 결제일", "2026.09.15"],
+              ["누적 안심 제보", "27회"],
+              ["최근 주문", "착코어 B · 배송완료"],
+            ].map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm ring-1 ring-gray-100">
+                <span className="text-sm text-gray-500">{k}</span>
+                <span className="text-sm font-bold text-navy">{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {page === "간단한 설정" && (
+          <div className="space-y-3">
+            {[
+              ["이탈 알림", true],
+              ["평소 경로 이탈 선제 알림", true],
+              ["재난문자 연동", true],
+              ["주변 안심 스캔", true],
+              ["진동", false],
+            ].map(([k, on]) => (
+              <div key={k as string} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm ring-1 ring-gray-100">
+                <span className="text-sm font-semibold text-navy">{k}</span>
+                <span className={`relative h-7 w-12 rounded-full ${on ? "bg-mint" : "bg-gray-200"}`}>
+                  <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow ${on ? "left-[22px]" : "left-0.5"}`} />
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {page === "자사몰" && (
+          <div className="space-y-4">
+            <div className="rounded-3xl bg-coral-light p-5 ring-1 ring-coral/20">
+              <p className="text-sm font-extrabold text-coral-dark">신규 회원 첫 구매 15% 할인</p>
+              <p className="mt-1 text-xs text-gray-500">착코어 스타터 키트를 만나보세요</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                ["착코어 (2개입)", "49,000원"],
+                ["실리콘 스트랩", "8,900원"],
+                ["신발 부착 클립", "6,500원"],
+                ["가방 태그", "5,900원"],
+              ].map(([n, p]) => (
+                <div key={n} className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
+                  <div className="mb-2 aspect-square rounded-xl bg-gray-200" />
+                  <p className="text-xs font-bold text-navy">{n}</p>
+                  <p className="text-sm font-extrabold text-mint-dark">{p}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const NOTIFS: { icon: "alert" | "route" | "gift" | "megaphone"; tone: "coral" | "mint"; title: string; body: string; ts: string }[] = [
+  { icon: "route", tone: "coral", title: "평소 경로 이탈 감지", body: "평소 이동 경로를 80% 이상 벗어났습니다.", ts: "5분 전" },
+  { icon: "gift", tone: "mint", title: "안심 리워드 적립", body: "실종자 찾기 제보로 +500P가 적립됐어요.", ts: "오늘 14:20" },
+  { icon: "megaphone", tone: "coral", title: "실종경보 수신", body: "성동구 실종아동 발생 · 주변 안심 스캔이 켜졌어요.", ts: "오늘 13:02" },
+  { icon: "alert", tone: "mint", title: "안전반경 복귀", body: "김서준 님이 안전반경 안으로 돌아왔어요.", ts: "어제 18:40" },
+];
+
+function NotificationPanel({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="absolute inset-0 z-40 flex justify-end">
+      <div className="animate-fade-in absolute inset-0 bg-navy/30" onClick={onClose} />
+      <div className="animate-slide-up relative flex h-full w-[86%] max-w-[340px] flex-col bg-gray-50 shadow-2xl">
+        <header className="flex items-center justify-between border-b border-gray-100 bg-white/90 px-5 py-3.5 backdrop-blur">
+          <p className="text-base font-extrabold text-navy">알림</p>
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition active:scale-90 active:bg-gray-100"
+          >
+            <Icon name="close" className="h-5 w-5" />
+          </button>
+        </header>
+        <div className="flex-1 space-y-2.5 overflow-y-auto p-4">
+          {NOTIFS.map((n, i) => (
+            <div key={i} className="flex gap-3 rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100">
+              <span
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                  n.tone === "coral" ? "bg-coral-light text-coral-dark" : "bg-mint-light text-mint-dark"
+                }`}
+              >
+                <Icon name={n.icon} className="h-5 w-5" />
+              </span>
+              <div className="flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-bold text-navy">{n.title}</p>
+                  <span className="shrink-0 text-[10px] text-gray-400">{n.ts}</span>
+                </div>
+                <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{n.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    앱 셸 + 네비게이션
    ============================================================ */
 
 const TABS: {
   key: TabKey;
   label: string;
-  icon: "home" | "signal" | "map" | "wallet";
+  icon: "home" | "map" | "chart" | "wallet";
 }[] = [
   { key: "home", label: "홈", icon: "home" },
-  { key: "geo", label: "지오펜스", icon: "signal" },
-  { key: "map", label: "탐색지도", icon: "map" },
+  { key: "live", label: "라이브 지도", icon: "map" },
+  { key: "report", label: "리포트", icon: "chart" },
   { key: "reward", label: "리워드", icon: "wallet" },
 ];
 
@@ -1134,6 +1791,10 @@ export default function App() {
     core: Core;
     distance: number;
   } | null>(null);
+  const [patternAlert, setPatternAlert] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [menuPage, setMenuPage] = useState<null | string>(null);
 
   const [cores, setCores] = useState<Core[]>([
     {
@@ -1205,13 +1866,23 @@ export default function App() {
       {/* 모바일 프레임 */}
       <div className="relative flex h-full w-full max-w-[440px] flex-col overflow-hidden bg-gray-50 shadow-2xl sm:h-[900px] sm:rounded-[2.5rem]">
         {/* 상단 헤더 */}
-        <header className="flex items-center justify-between border-b border-gray-100 bg-white/90 px-5 py-3.5 backdrop-blur">
+        <header className="flex items-center justify-between border-b border-gray-100 bg-white/90 px-4 py-3.5 backdrop-blur">
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-navy transition active:scale-90 active:bg-gray-100"
+          >
+            <Icon name="menu" className="h-6 w-6" />
+          </button>
           <p className="text-lg font-extrabold tracking-tight text-navy">
             ChakCare
           </p>
-          <Chip tone={relayOn ? "mint" : "gray"}>
-            릴레이 {relayOn ? "ON" : "OFF"}
-          </Chip>
+          <button
+            onClick={() => setNotifOpen(true)}
+            className="relative flex h-9 w-9 items-center justify-center rounded-xl text-navy transition active:scale-90 active:bg-gray-100"
+          >
+            <Icon name="bell" className="h-6 w-6" />
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-coral ring-2 ring-white" />
+          </button>
         </header>
 
         {/* 스크롤 콘텐츠 */}
@@ -1225,16 +1896,20 @@ export default function App() {
               onGo={setTab}
             />
           )}
-          {tab === "geo" && (
-            <GeofenceScreen
+          {tab === "live" && (
+            <LiveMapScreen
               radius={radius}
               setRadius={setRadius}
               cores={cores}
               setCores={setCores}
               onTriggerAlert={triggerAlert}
+              relayOn={relayOn}
+              setRelayOn={setRelayOn}
             />
           )}
-          {tab === "map" && <MapScreen relayOn={relayOn} />}
+          {tab === "report" && (
+            <ReportScreen onPreviewAlert={() => setPatternAlert(true)} />
+          )}
           {tab === "reward" && (
             <RewardScreen
               points={points}
@@ -1248,7 +1923,7 @@ export default function App() {
         </main>
 
         {/* 하단 탭바 */}
-        <nav className="grid grid-cols-4 border-t border-gray-100 bg-white/95 px-2 pb-2 pt-1.5 backdrop-blur">
+        <nav className="grid grid-cols-4 border-t border-gray-100 bg-white/95 px-1.5 pb-2 pt-1.5 backdrop-blur">
           {TABS.map((t) => {
             const on = tab === t.key;
             return (
@@ -1286,6 +1961,29 @@ export default function App() {
             onClose={() => setActiveAlert(null)}
           />
         )}
+
+        {patternAlert && (
+          <PatternAlertModal onClose={() => setPatternAlert(false)} />
+        )}
+
+        {/* 왼쪽 메뉴 드로어 */}
+        {drawerOpen && (
+          <Drawer
+            onClose={() => setDrawerOpen(false)}
+            onOpenPage={(p) => {
+              setMenuPage(p);
+              setDrawerOpen(false);
+            }}
+          />
+        )}
+
+        {/* 메뉴 상세 페이지 */}
+        {menuPage && (
+          <MenuPage page={menuPage} onClose={() => setMenuPage(null)} />
+        )}
+
+        {/* 오른쪽 알림 패널 */}
+        {notifOpen && <NotificationPanel onClose={() => setNotifOpen(false)} />}
       </div>
     </div>
   );
