@@ -1,289 +1,240 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react"
 
 /* ============================================================
    착케어 (ChakCare) — 실종·분실 방지 스마트 앱
-   MVP: (1) 0.5초 지오펜싱 이탈 경보 (칼만 필터)
-        (2) 백그라운드 P2P 릴레이 스캔 + 안심 리워드
-        (3) 재난문자 연동 실시간 탐색 지도 (E2EE / 가명 ID)
    ============================================================ */
 
 type Core = {
-  id: string;
-  name: string;
-  battery: number; // %
-  connected: boolean;
-  monitoring: boolean; // 이탈 알림 on/off
-  rssi: number; // dBm (raw)
-};
+  id: string
+  name: string
+  battery: number
+  connected: boolean
+  monitoring: boolean
+  rssi: number
+}
 
 type Reward = {
-  id: string;
-  ts: string;
-  label: string;
-  area: string;
-  points: number;
-};
+  id: string
+  ts: string
+  label: string
+  area: string
+  points: number
+}
 
 type ShopItem = {
-  id: string;
-  brand: string;
-  name: string;
-  cost: number;
-};
+  id: string
+  brand: string
+  name: string
+  cost: number
+}
+
+type TabKey = "home" | "live" | "report" | "reward"
+
+const PROTECTED = { name: "김철수", relation: "부 · 만 74세" }
 
 const SHOP_ITEMS: ShopItem[] = [
   { id: "s1", brand: "카페", name: "아메리카노 Tall", cost: 4500 },
   { id: "s2", brand: "편의점", name: "5,000원 금액권", cost: 5000 },
   { id: "s3", brand: "베이커리", name: "조각케이크 교환권", cost: 6500 },
   { id: "s4", brand: "치킨", name: "후라이드 한 마리", cost: 20000 },
-];
-
-type TabKey = "home" | "live" | "report" | "reward";
-
-const PROTECTED = {
-  name: "김철수",
-  relation: "아들 · 만 7세",
-  photo:
-    "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=200&h=200&fit=crop&auto=format",
-};
+]
 
 /* ---------- 신호 유틸: RSSI → 거리, 칼만 필터 ---------- */
 
-// 로그-거리 경로손실 모델로 RSSI를 대략적 거리(m)로 환산
 function rssiToDistance(rssi: number, txPower = -59, n = 2.4) {
-  return Math.pow(10, (txPower - rssi) / (10 * n));
+  return Math.pow(10, (txPower - rssi) / (10 * n))
 }
 
-// 1D 칼만 필터 (신호 보정 엔진)
 class Kalman {
-  private R: number; // 측정 잡음
-  private Q: number; // 프로세스 잡음
-  private A = 1;
-  private C = 1;
-  private cov = NaN;
-  private x = NaN;
-  constructor(R = 4, Q = 0.6) {
-    this.R = R;
-    this.Q = Q;
-  }
+  private cov = NaN
+  private x = NaN
+  constructor(
+    private r = 4,
+    private q = 0.6,
+  ) {}
   filter(z: number) {
     if (isNaN(this.x)) {
-      this.x = z / this.C;
-      this.cov = this.R / (this.C * this.C);
+      this.x = z
+      this.cov = this.r
     } else {
-      const predX = this.A * this.x;
-      const predCov = this.A * this.cov * this.A + this.Q;
-      const K = (predCov * this.C) / (this.C * predCov * this.C + this.R);
-      this.x = predX + K * (z - this.C * predX);
-      this.cov = predCov - K * this.C * predCov;
+      const pCov = this.cov + this.q
+      const k = pCov / (pCov + this.r)
+      this.x += k * (z - this.x)
+      this.cov = (1 - k) * pCov
     }
-    return this.x;
+    return this.x
   }
 }
 
-/* ============================================================
-   단색 라인 아이콘
-   ============================================================ */
+/* ---------- 라인 아이콘 ---------- */
+
+const ICONS: Record<string, React.ReactNode> = {
+  home: (
+    <>
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9.5V21h14V9.5" />
+    </>
+  ),
+  signal: (
+    <>
+      <path d="M12 20h.01" />
+      <path d="M8.5 16.5a5 5 0 0 1 7 0" />
+      <path d="M5.5 13a10 10 0 0 1 13 0" />
+      <path d="M2.5 9.5a15 15 0 0 1 19 0" />
+    </>
+  ),
+  map: (
+    <>
+      <path d="M9 3 3 5.5v15.5l6-2.5 6 2.5 6-2.5V3l-6 2.5L9 3Z" />
+      <path d="M9 3v15.5" />
+      <path d="M15 5.5V21" />
+    </>
+  ),
+  wallet: (
+    <>
+      <rect x="3" y="6" width="18" height="13" rx="2.5" />
+      <path d="M3 10h18" />
+      <path d="M16 14.5h.01" />
+    </>
+  ),
+  person: (
+    <>
+      <circle cx="12" cy="8" r="3.2" />
+      <path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+    </>
+  ),
+  phone: (
+    <>
+      <rect x="7" y="3" width="10" height="18" rx="2.5" />
+      <path d="M11 18h2" />
+    </>
+  ),
+  link: (
+    <>
+      <path d="M9.5 14.5l5-5" />
+      <path d="M11.5 7.5l1-1a3.5 3.5 0 0 1 5 5l-1 1" />
+      <path d="M12.5 16.5l-1 1a3.5 3.5 0 0 1-5-5l1-1" />
+    </>
+  ),
+  alert: (
+    <>
+      <path d="M12 3 2 20h20L12 3Z" />
+      <path d="M12 9v5" />
+      <path d="M12 17h.01" />
+    </>
+  ),
+  megaphone: (
+    <>
+      <path d="M4 10v4h4l7 4V6l-7 4H4Z" />
+      <path d="M18 9a3 3 0 0 1 0 6" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6" />
+      <path d="M20 20l-4-4" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </>
+  ),
+  broadcast: (
+    <>
+      <circle cx="12" cy="12" r="2" />
+      <path d="M8 8a5.6 5.6 0 0 0 0 8" />
+      <path d="M16 8a5.6 5.6 0 0 1 0 8" />
+      <path d="M5 5a10 10 0 0 0 0 14" />
+      <path d="M19 5a10 10 0 0 1 0 14" />
+    </>
+  ),
+  gift: (
+    <>
+      <path d="M4 11.5h16V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-8.5Z" />
+      <path d="M3 8h18v3.5H3V8Z" />
+      <path d="M12 8v13" />
+      <path d="M12 8S10.5 3.5 8 4.5 9.5 8 12 8Zm0 0s1.5-4.5 4-3.5S14.5 8 12 8Z" />
+    </>
+  ),
+  check: <path d="M5 12.5l4.5 4.5L19 7" />,
+  walk: (
+    <>
+      <circle cx="13" cy="4.5" r="1.6" />
+      <path d="M11 21l1.5-5-2.5-2.5 1-5 3 2 2 2" />
+      <path d="M11 13l-2 3-2 3" />
+    </>
+  ),
+  pause: (
+    <>
+      <path d="M9 6v12" />
+      <path d="M15 6v12" />
+    </>
+  ),
+  chart: (
+    <>
+      <path d="M3 21h18" />
+      <path d="M6.5 21v-6" />
+      <path d="M12 21V8" />
+      <path d="M17.5 21v-9" />
+    </>
+  ),
+  route: (
+    <>
+      <circle cx="6" cy="19" r="2" />
+      <circle cx="18" cy="5" r="2" />
+      <path d="M8 19h6.5a3 3 0 0 0 0-6h-5a3 3 0 0 1 0-6H16" />
+    </>
+  ),
+  home2: (
+    <>
+      <path d="M4 11 12 4l8 7" />
+      <path d="M6 10v10h12V10" />
+    </>
+  ),
+  menu: (
+    <>
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
+    </>
+  ),
+  bell: (
+    <>
+      <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" />
+      <path d="M10 19a2 2 0 0 0 4 0" />
+    </>
+  ),
+  settings: (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" />
+    </>
+  ),
+  store: (
+    <>
+      <path d="M4 9h16l-1-4H5L4 9Z" />
+      <path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9" />
+      <path d="M10 20v-5h4v5" />
+    </>
+  ),
+  chevron: <path d="M9 6l6 6-6 6" />,
+  close: (
+    <>
+      <path d="M6 6l12 12" />
+      <path d="M18 6 6 18" />
+    </>
+  ),
+}
 
 function Icon({
   name,
   className = "h-5 w-5",
 }: {
-  name:
-    | "home"
-    | "signal"
-    | "map"
-    | "wallet"
-    | "person"
-    | "phone"
-    | "link"
-    | "alert"
-    | "megaphone"
-    | "search"
-    | "pin"
-    | "broadcast"
-    | "gift"
-    | "check"
-    | "walk"
-    | "pause"
-    | "chart"
-    | "route"
-    | "home2"
-    | "menu"
-    | "bell"
-    | "settings"
-    | "store"
-    | "chevron"
-    | "close";
-  className?: string;
+  name: string
+  className?: string
 }) {
-  const paths: Record<string, React.ReactNode> = {
-    home: (
-      <>
-        <path d="M3 10.5 12 3l9 7.5" />
-        <path d="M5 9.5V21h14V9.5" />
-      </>
-    ),
-    signal: (
-      <>
-        <path d="M12 20h.01" />
-        <path d="M8.5 16.5a5 5 0 0 1 7 0" />
-        <path d="M5.5 13a10 10 0 0 1 13 0" />
-        <path d="M2.5 9.5a15 15 0 0 1 19 0" />
-      </>
-    ),
-    map: (
-      <>
-        <path d="M9 3 3 5.5v15.5l6-2.5 6 2.5 6-2.5V3l-6 2.5L9 3Z" />
-        <path d="M9 3v15.5" />
-        <path d="M15 5.5V21" />
-      </>
-    ),
-    wallet: (
-      <>
-        <rect x="3" y="6" width="18" height="13" rx="2.5" />
-        <path d="M3 10h18" />
-        <path d="M16 14.5h.01" />
-      </>
-    ),
-    person: (
-      <>
-        <circle cx="12" cy="8" r="3.2" />
-        <path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
-      </>
-    ),
-    phone: (
-      <>
-        <rect x="7" y="3" width="10" height="18" rx="2.5" />
-        <path d="M11 18h2" />
-      </>
-    ),
-    link: (
-      <>
-        <path d="M9.5 14.5l5-5" />
-        <path d="M11.5 7.5l1-1a3.5 3.5 0 0 1 5 5l-1 1" />
-        <path d="M12.5 16.5l-1 1a3.5 3.5 0 0 1-5-5l1-1" />
-      </>
-    ),
-    alert: (
-      <>
-        <path d="M12 3 2 20h20L12 3Z" />
-        <path d="M12 9v5" />
-        <path d="M12 17h.01" />
-      </>
-    ),
-    megaphone: (
-      <>
-        <path d="M4 10v4h4l7 4V6l-7 4H4Z" />
-        <path d="M18 9a3 3 0 0 1 0 6" />
-      </>
-    ),
-    search: (
-      <>
-        <circle cx="11" cy="11" r="6" />
-        <path d="M20 20l-4-4" />
-      </>
-    ),
-    pin: (
-      <>
-        <path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z" />
-        <circle cx="12" cy="10" r="2.5" />
-      </>
-    ),
-    broadcast: (
-      <>
-        <circle cx="12" cy="12" r="2" />
-        <path d="M8 8a5.6 5.6 0 0 0 0 8" />
-        <path d="M16 8a5.6 5.6 0 0 1 0 8" />
-        <path d="M5 5a10 10 0 0 0 0 14" />
-        <path d="M19 5a10 10 0 0 1 0 14" />
-      </>
-    ),
-    gift: (
-      <>
-        <path d="M4 11.5h16V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-8.5Z" />
-        <path d="M3 8h18v3.5H3V8Z" />
-        <path d="M12 8v13" />
-        <path d="M12 8S10.5 3.5 8 4.5 9.5 8 12 8Zm0 0s1.5-4.5 4-3.5S14.5 8 12 8Z" />
-      </>
-    ),
-    check: (
-      <>
-        <path d="M5 12.5l4.5 4.5L19 7" />
-      </>
-    ),
-    walk: (
-      <>
-        <circle cx="13" cy="4.5" r="1.6" />
-        <path d="M11 21l1.5-5-2.5-2.5 1-5 3 2 2 2" />
-        <path d="M11 13l-2 3-2 3" />
-      </>
-    ),
-    pause: (
-      <>
-        <path d="M9 6v12" />
-        <path d="M15 6v12" />
-      </>
-    ),
-    chart: (
-      <>
-        <path d="M3 21h18" />
-        <path d="M6.5 21v-6" />
-        <path d="M12 21V8" />
-        <path d="M17.5 21v-9" />
-      </>
-    ),
-    route: (
-      <>
-        <circle cx="6" cy="19" r="2" />
-        <circle cx="18" cy="5" r="2" />
-        <path d="M8 19h6.5a3 3 0 0 0 0-6h-5a3 3 0 0 1 0-6H16" />
-      </>
-    ),
-    home2: (
-      <>
-        <path d="M4 11 12 4l8 7" />
-        <path d="M6 10v10h12V10" />
-      </>
-    ),
-    menu: (
-      <>
-        <path d="M4 7h16" />
-        <path d="M4 12h16" />
-        <path d="M4 17h16" />
-      </>
-    ),
-    bell: (
-      <>
-        <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" />
-        <path d="M10 19a2 2 0 0 0 4 0" />
-      </>
-    ),
-    settings: (
-      <>
-        <circle cx="12" cy="12" r="3" />
-        <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" />
-      </>
-    ),
-    store: (
-      <>
-        <path d="M4 9h16l-1-4H5L4 9Z" />
-        <path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9" />
-        <path d="M10 20v-5h4v5" />
-      </>
-    ),
-    chevron: (
-      <>
-        <path d="M9 6l6 6-6 6" />
-      </>
-    ),
-    close: (
-      <>
-        <path d="M6 6l12 12" />
-        <path d="M18 6 6 18" />
-      </>
-    ),
-  };
   return (
     <svg
       viewBox="0 0 24 24"
@@ -294,18 +245,16 @@ function Icon({
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      {paths[name]}
+      {ICONS[name]}
     </svg>
-  );
+  )
 }
 
-/* ============================================================
-   작은 UI 컴포넌트
-   ============================================================ */
+/* ---------- 공통 컴포넌트 ---------- */
 
 function BatteryBar({ level }: { level: number }) {
   const color =
-    level > 50 ? "bg-mint" : level > 20 ? "bg-[#F2BE55]" : "bg-coral";
+    level > 50 ? "bg-mint" : level > 20 ? "bg-[#F2BE55]" : "bg-coral"
   return (
     <div className="flex items-center gap-2">
       <div className="relative h-3.5 w-7 rounded-[3px] border-[1.5px] border-gray-500/60">
@@ -313,55 +262,21 @@ function BatteryBar({ level }: { level: number }) {
           className={`absolute inset-[1.5px] rounded-[1px] ${color} transition-all`}
           style={{ width: `calc(${Math.max(6, level)}% - 3px)` }}
         />
-        <div className="absolute -right-[3px] top-1/2 h-1.5 w-[2px] -translate-y-1/2 rounded-r bg-gray-500/60" />
+        <div className="absolute -right-0.75 top-1/2 h-1.5 w-0.5 -translate-y-1/2 rounded-r bg-gray-500/60" />
       </div>
       <span className="text-xs font-semibold tabular-nums text-gray-700">
         {level}%
       </span>
     </div>
-  );
+  )
 }
 
-function SignalBars({ rssi }: { rssi: number }) {
-  // rssi 범위 대략 -40(강) ~ -95(약)
-  const strength = Math.min(4, Math.max(0, Math.round((rssi + 95) / 14)));
-  return (
-    <div className="flex items-end gap-[3px]">
-      {[0, 1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className={`w-[3px] rounded-full transition-colors ${
-            i < strength ? "bg-mint" : "bg-gray-200"
-          }`}
-          style={{ height: 5 + i * 4 }}
-        />
-      ))}
-    </div>
-  );
+type SectionTitleProps = {
+  title: string
+  sub?: string
 }
 
-function Chip({
-  children,
-  tone = "mint",
-}: {
-  children: React.ReactNode;
-  tone?: "mint" | "coral" | "gray";
-}) {
-  const tones = {
-    mint: "bg-mint-light text-mint-dark",
-    coral: "bg-coral-light text-coral-dark",
-    gray: "bg-gray-100 text-gray-700",
-  };
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${tones[tone]}`}
-    >
-      {children}
-    </span>
-  );
-}
-
-function SectionTitle({ title, sub }: { title: string; sub?: string }) {
+function SectionTitle({ title, sub }: SectionTitleProps) {
   return (
     <div className="mb-3 flex items-end justify-between">
       <h2 className="text-[15px] font-extrabold tracking-tight text-navy">
@@ -369,32 +284,58 @@ function SectionTitle({ title, sub }: { title: string; sub?: string }) {
       </h2>
       {sub && <span className="text-xs text-gray-500">{sub}</span>}
     </div>
-  );
+  )
 }
 
-/* ============================================================
-   비상 경보 모달 (0.5초 즉각 경보)
-   ============================================================ */
+function Toggle({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean
+  onChange: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      onClick={onChange}
+      disabled={disabled}
+      className={`relative h-7 w-12 rounded-full transition-colors disabled:opacity-40 ${
+        checked ? "bg-mint" : "bg-gray-200"
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${
+          checked ? "left-5.5" : "left-0.5"
+        }`}
+      />
+    </button>
+  )
+}
+
+/* ---------- 모달 ---------- */
 
 function AlertModal({
   core,
   distance,
   radius,
   onClose,
+  onViewLocation,
 }: {
-  core: Core;
-  distance: number;
-  radius: number;
-  onClose: () => void;
+  core: Core
+  distance: number
+  radius: number
+  onClose: () => void
+  onViewLocation: () => void
 }) {
-  const [seconds, setSeconds] = useState(0);
+  const [seconds, setSeconds] = useState(0)
   useEffect(() => {
-    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
+    const t = setInterval(() => setSeconds((s) => s + 1), 1000)
     try {
-      navigator.vibrate?.([400, 200, 400, 200, 600]);
+      navigator.vibrate?.([400, 200, 400, 200, 600])
     } catch {}
-    return () => clearInterval(t);
-  }, []);
+    return () => clearInterval(t)
+  }, [])
 
   return (
     <div className="absolute inset-0 z-50 flex items-end justify-center bg-navy/60 backdrop-blur-sm">
@@ -451,7 +392,7 @@ function AlertModal({
               해제
             </button>
             <button
-              onClick={onClose}
+              onClick={onViewLocation}
               className="flex-1 rounded-2xl bg-coral py-3.5 text-sm font-bold text-white shadow-lg shadow-coral/30 transition active:scale-[.98]"
             >
               확인
@@ -460,12 +401,69 @@ function AlertModal({
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-/* ============================================================
-   0) 홈
-   ============================================================ */
+function PatternAlertModal({
+  onClose,
+  onViewLocation,
+}: {
+  onClose: () => void
+  onViewLocation: () => void
+}) {
+  useEffect(() => {
+    try {
+      navigator.vibrate?.([300, 150, 300])
+    } catch {}
+  }, [])
+
+  return (
+    <div className="absolute inset-0 z-50 flex items-end justify-center bg-navy/60 backdrop-blur-sm">
+      <div className="animate-slide-up w-full overflow-hidden rounded-t-3xl bg-white">
+        <div className="animate-siren px-6 py-5 text-white">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20">
+              <Icon name="route" className="h-6 w-6" />
+            </span>
+            <div>
+              <p className="text-lg font-extrabold leading-tight">
+                평소 경로 이탈 감지
+              </p>
+              <p className="text-sm opacity-90">{PROTECTED.name}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 px-6 pb-8 pt-5">
+          <p className="text-center text-xl font-extrabold text-navy">
+            평소 이동 경로를
+            <br />
+            <span className="text-coral-dark">80% 이상</span> 벗어났습니다
+          </p>
+          <p className="rounded-2xl bg-coral-light px-4 py-3 text-center text-[13px] leading-relaxed text-coral-dark">
+            평소 가지 않던 방향으로 이동하고 있어요. 위치를 확인해 주세요.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-2xl bg-gray-100 py-3.5 text-sm font-bold text-gray-700 transition active:scale-[.98]"
+            >
+              해제
+            </button>
+            <button
+              onClick={onViewLocation}
+              className="flex-1 rounded-2xl bg-coral py-3.5 text-sm font-bold text-white shadow-lg shadow-coral/30 transition active:scale-[.98]"
+            >
+              위치 확인
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ---------- 0) 홈 화면 ---------- */
 
 function HomeScreen({
   cores,
@@ -474,17 +472,15 @@ function HomeScreen({
   relayOn,
   onGo,
 }: {
-  cores: Core[];
-  radius: number;
-  points: number;
-  relayOn: boolean;
-  onGo: (t: TabKey) => void;
+  cores: Core[]
+  radius: number
+  points: number
+  relayOn: boolean
+  onGo: (t: TabKey) => void
 }) {
-  const connected = cores.filter((c) => c.connected).length;
-  const safe = true;
+  const connected = cores.filter((c) => c.connected).length
   return (
     <div className="space-y-5">
-      {/* 대형 상태 카드 */}
       <div className="relative overflow-hidden rounded-3xl bg-mint p-6 text-white">
         <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10" />
         <div className="absolute right-6 top-8 h-24 w-24 rounded-full bg-white/10" />
@@ -500,7 +496,7 @@ function HomeScreen({
               김철수 · 부 · 만 74세
             </p>
             <p className="text-2xl font-extrabold tracking-tight">
-              {safe ? "안심 · 반경 내" : "이탈 감지"}
+              안심 · 반경 내
             </p>
           </div>
         </div>
@@ -519,12 +515,11 @@ function HomeScreen({
         </div>
       </div>
 
-      {/* 빠른 실행 */}
       <div className="grid grid-cols-3 gap-2.5">
         {[
-          { t: "라이브 지도", i: "map" as const, tab: "live" as TabKey },
-          { t: "활동 리포트", i: "chart" as const, tab: "report" as TabKey },
-          { t: "안심 리워드", i: "wallet" as const, tab: "reward" as TabKey },
+          { t: "라이브 지도", i: "map", tab: "live" as TabKey },
+          { t: "활동 리포트", i: "chart", tab: "report" as TabKey },
+          { t: "안심 리워드", i: "wallet", tab: "reward" as TabKey },
         ].map((q) => (
           <button
             key={q.t}
@@ -541,7 +536,6 @@ function HomeScreen({
         ))}
       </div>
 
-      {/* 디바이스 배터리 */}
       <div>
         <SectionTitle title="내 착코어" sub={`${cores.length}개 연결`} />
         <div className="space-y-2.5">
@@ -567,7 +561,6 @@ function HomeScreen({
         </div>
       </div>
 
-      {/* 안심 요약 */}
       <button
         onClick={() => onGo("reward")}
         className="flex w-full items-center gap-3 rounded-2xl bg-navy p-4 text-left text-white transition active:scale-[.99]"
@@ -584,12 +577,10 @@ function HomeScreen({
         <span className="text-sm opacity-70">지갑 보기 ›</span>
       </button>
     </div>
-  );
+  )
 }
 
-/* ============================================================
-   1) 지오펜스
-   ============================================================ */
+/* ---------- 1) 지오펜스 라이브 지도 ---------- */
 
 function LiveMapScreen({
   radius,
@@ -600,82 +591,62 @@ function LiveMapScreen({
   relayOn,
   setRelayOn,
 }: {
-  radius: number;
-  setRadius: (r: number) => void;
-  cores: Core[];
-  setCores: React.Dispatch<React.SetStateAction<Core[]>>;
-  onTriggerAlert: (core: Core, distance: number) => void;
-  relayOn: boolean;
-  setRelayOn: (v: boolean) => void;
+  radius: number
+  setRadius: (r: number) => void
+  cores: Core[]
+  setCores: React.Dispatch<React.SetStateAction<Core[]>>
+  onTriggerAlert: (core: Core, distance: number) => void
+  relayOn: boolean
+  setRelayOn: (v: boolean) => void
 }) {
-  const monitored = cores.filter((c) => c.connected && c.monitoring);
-  const monitoringOn = monitored.length > 0;
-  const active = monitored[0] ?? cores.find((c) => c.connected) ?? cores[0];
+  const monitored = cores.filter((c) => c.connected && c.monitoring)
+  const monitoringOn = monitored.length > 0
+  const active = monitored[0] ?? cores.find((c) => c.connected) ?? cores[0]
 
-  // 칼만 필터로 RSSI를 내부 보정 (화면에는 결과 거리만 노출)
-  const [lastFiltered, setLastFiltered] = useState(-60);
-  const [walking, setWalking] = useState(false); // 움직임 감지 (걷는 중/정지)
-  const kalman = useRef(new Kalman());
-  const baseRef = useRef(-60);
+  const [lastFiltered, setLastFiltered] = useState(-60)
+  const [walking, setWalking] = useState(false)
+  const kalman = useRef(new Kalman())
+  const baseRef = useRef(-60)
 
   useEffect(() => {
     const id = setInterval(() => {
       if (walking) {
-        // 이동 중일 때만 신호가 약해지며 멀어짐
-        baseRef.current = Math.max(-95, baseRef.current - 1.8);
+        baseRef.current = Math.max(-95, baseRef.current - 1.8)
       } else {
-        // 정지 상태에서는 안정적으로 제자리(-60) 유지
-        baseRef.current += (-60 - baseRef.current) * 0.3;
+        baseRef.current += (-60 - baseRef.current) * 0.3
       }
-      const jitter = walking ? 9 : 2;
-      const noisy = baseRef.current + (Math.random() - 0.5) * jitter;
-      setLastFiltered(kalman.current.filter(noisy));
-    }, 250);
-    return () => clearInterval(id);
-  }, [walking]);
+      const jitter = walking ? 9 : 2
+      const noisy = baseRef.current + (Math.random() - 0.5) * jitter
+      setLastFiltered(kalman.current.filter(noisy))
+    }, 250)
+    return () => clearInterval(id)
+  }, [walking])
 
-  const distance = rssiToDistance(lastFiltered);
-  const inside = distance <= radius;
-  const safe = monitoringOn && inside;
-  const breach = monitoringOn && !inside;
-  const pct = monitoringOn ? Math.min(1, distance / (radius * 1.6)) : 0;
+  const distance = rssiToDistance(lastFiltered)
+  const inside = distance <= radius
+  const safe = monitoringOn && inside
+  const breach = monitoringOn && !inside
+  const pct = monitoringOn ? Math.min(1, distance / (radius * 1.6)) : 0
 
-  // 반경 이탈 순간, 모니터링 중인 경우에만 보호자에게 자동 경보
-  const wasInside = useRef(true);
+  const wasInside = useRef(true)
   useEffect(() => {
     if (monitoringOn && wasInside.current && !inside) {
-      onTriggerAlert(active, distance);
+      onTriggerAlert(active, distance)
     }
-    wasInside.current = inside;
-  }, [inside, monitoringOn]);
+    wasInside.current = inside
+  }, [inside, monitoringOn])
 
-  const tone = breach ? "coral" : safe ? "mint" : "gray";
-  const bannerBg =
-    tone === "coral" ? "bg-coral" : tone === "mint" ? "bg-mint" : "bg-gray-400";
-  const fieldBg =
-    tone === "coral"
-      ? "bg-coral-light"
-      : tone === "mint"
-      ? "bg-mint-light"
-      : "bg-gray-100";
-  const markColor =
-    tone === "coral" ? "bg-coral" : tone === "mint" ? "bg-mint" : "bg-gray-300";
-  const ringColor =
-    tone === "coral"
-      ? "border-coral/30"
-      : tone === "mint"
-      ? "border-mint/30"
-      : "border-gray-300/50";
+  const bannerBg = breach ? "bg-coral" : safe ? "bg-mint" : "bg-gray-400"
+  const markColor = breach ? "bg-coral" : safe ? "bg-mint" : "bg-gray-300"
 
   function toggleCore(id: string) {
     setCores((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, monitoring: !c.monitoring } : c))
-    );
+      prev.map((c) => (c.id === id ? { ...c, monitoring: !c.monitoring } : c)),
+    )
   }
 
   return (
     <div className="space-y-5">
-      {/* 대상자 상태 배너 */}
       <div
         className={`flex items-center gap-3 rounded-3xl p-4 text-white transition-colors ${bannerBg}`}
       >
@@ -699,7 +670,6 @@ function LiveMapScreen({
         sub={monitoringOn ? (inside ? "반경 내" : "이탈") : "꺼짐"}
       />
 
-      {/* 재난문자 배너 (안심 스캔 ON 일 때만) */}
       {relayOn && (
         <div className="animate-siren rounded-2xl px-4 py-3 text-white">
           <div className="flex items-start gap-2.5">
@@ -716,17 +686,31 @@ function LiveMapScreen({
         </div>
       )}
 
-      {/* 통합 지도: 내 비콘 + (스캔 시) 주변 비콘 동시 표시 */}
       <div className="relative aspect-square overflow-hidden rounded-3xl ring-1 ring-gray-200">
         <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full">
           <rect width="400" height="400" fill="#EEF7F6" />
           {[70, 150, 230, 310].map((y) => (
-            <line key={`h${y}`} x1="0" y1={y} x2="400" y2={y} stroke="#D9ECEA" strokeWidth="9" />
+            <line
+              key={`h${y}`}
+              x1="0"
+              y1={y}
+              x2="400"
+              y2={y}
+              stroke="#D9ECEA"
+              strokeWidth="9"
+            />
           ))}
           {[60, 150, 250, 340].map((x) => (
-            <line key={`v${x}`} x1={x} y1="0" x2={x} y2="400" stroke="#D9ECEA" strokeWidth="9" />
+            <line
+              key={`v${x}`}
+              x1={x}
+              y1="0"
+              x2={x}
+              y2="400"
+              stroke="#D9ECEA"
+              strokeWidth="9"
+            />
           ))}
-          {/* 내 안전반경 (지오펜스) */}
           <circle
             cx="200"
             cy="210"
@@ -738,10 +722,13 @@ function LiveMapScreen({
           />
         </svg>
 
-        {/* 내 비콘 (중심) */}
         <div
           className="absolute flex h-11 w-11 items-center justify-center rounded-full bg-white text-navy shadow-md"
-          style={{ left: "50%", top: "52.5%", transform: "translate(-50%,-50%)" }}
+          style={{
+            left: "50%",
+            top: "52.5%",
+            transform: "translate(-50%,-50%)",
+          }}
         >
           <Icon name="phone" className="h-5 w-5" />
           {monitoringOn && (
@@ -753,7 +740,6 @@ function LiveMapScreen({
           )}
         </div>
 
-        {/* 대상자(내 비콘 연동) 위치 */}
         <div
           className="absolute transition-all duration-700 ease-out"
           style={{
@@ -769,7 +755,6 @@ function LiveMapScreen({
           </div>
         </div>
 
-        {/* 주변 비콘 신호 (안심 스캔 ON) */}
         {relayOn &&
           [
             { l: "26%", t: "30%" },
@@ -784,9 +769,10 @@ function LiveMapScreen({
             />
           ))}
 
-        {/* 추정 거리 */}
         <div className="absolute bottom-3 left-3 rounded-2xl bg-white/85 px-3 py-2 backdrop-blur">
-          <p className="text-[11px] font-semibold text-gray-500">내 비콘 거리</p>
+          <p className="text-[11px] font-semibold text-gray-500">
+            내 비콘 거리
+          </p>
           <p
             className={`text-2xl font-extrabold tabular-nums ${
               breach ? "text-coral-dark" : "text-navy"
@@ -797,11 +783,12 @@ function LiveMapScreen({
           </p>
         </div>
 
-        {/* 움직임 상태 */}
         <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1.5 backdrop-blur">
           <Icon
             name={walking ? "walk" : "pause"}
-            className={`h-4 w-4 ${walking ? "text-mint-dark" : "text-gray-400"}`}
+            className={`h-4 w-4 ${
+              walking ? "text-mint-dark" : "text-gray-400"
+            }`}
           />
           <span
             className={`text-xs font-bold ${
@@ -812,7 +799,6 @@ function LiveMapScreen({
           </span>
         </div>
 
-        {/* 범례 */}
         <div className="absolute bottom-3 right-3 space-y-1 rounded-2xl bg-white/85 px-3 py-2 text-[10px] backdrop-blur">
           <p className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-mint" /> 내 비콘
@@ -825,11 +811,12 @@ function LiveMapScreen({
         </div>
       </div>
 
-      {/* 주변 안심 스캔 토글 */}
       <div className="flex items-center gap-3 rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100">
         <span
           className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
-            relayOn ? "bg-coral-light text-coral-dark" : "bg-gray-100 text-gray-400"
+            relayOn
+              ? "bg-coral-light text-coral-dark"
+              : "bg-gray-100 text-gray-400"
           }`}
         >
           <Icon name="broadcast" className="h-5 w-5" />
@@ -842,21 +829,9 @@ function LiveMapScreen({
               : "내 비콘만 표시 중 · 켜면 주변도 함께 감지"}
           </p>
         </div>
-        <button
-          onClick={() => setRelayOn(!relayOn)}
-          className={`relative h-7 w-12 rounded-full transition-colors ${
-            relayOn ? "bg-mint" : "bg-gray-200"
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${
-              relayOn ? "left-[22px]" : "left-0.5"
-            }`}
-          />
-        </button>
+        <Toggle checked={relayOn} onChange={() => setRelayOn(!relayOn)} />
       </div>
 
-      {/* 반경 선택 */}
       <div>
         <SectionTitle title="안전반경 설정" />
         <div className="grid grid-cols-2 gap-3">
@@ -885,7 +860,6 @@ function LiveMapScreen({
         </div>
       </div>
 
-      {/* 코어별 이탈 알림 on/off */}
       <div>
         <SectionTitle title="이탈 알림 코어" sub="켜진 코어만 감지" />
         <div className="space-y-2.5">
@@ -910,33 +884,24 @@ function LiveMapScreen({
                     {!c.connected
                       ? "연결 끊김"
                       : c.monitoring
-                      ? "이탈 알림 켜짐"
-                      : "이탈 알림 꺼짐"}
+                        ? "이탈 알림 켜짐"
+                        : "이탈 알림 꺼짐"}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <BatteryBar level={c.battery} />
-                <button
-                  onClick={() => c.connected && toggleCore(c.id)}
+                <Toggle
+                  checked={c.connected && c.monitoring}
+                  onChange={() => c.connected && toggleCore(c.id)}
                   disabled={!c.connected}
-                  className={`relative h-7 w-12 rounded-full transition-colors disabled:opacity-40 ${
-                    c.connected && c.monitoring ? "bg-mint" : "bg-gray-200"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${
-                      c.connected && c.monitoring ? "left-[22px]" : "left-0.5"
-                    }`}
-                  />
-                </button>
+                />
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* 데모: 반경 이탈 시뮬레이션 (작은 버튼) */}
       <div className="flex flex-col items-center gap-1.5 pt-1">
         <button
           onMouseDown={() => setWalking(true)}
@@ -951,64 +916,72 @@ function LiveMapScreen({
         </button>
       </div>
     </div>
-  );
+  )
 }
 
-/* ============================================================
-   1.5) 활동 리포트 (생활 패턴 분석 결과)
-   ============================================================ */
+/* ---------- 2) 활동 리포트 ---------- */
 
-type Place = {
-  name: string;
-  desc: string;
-  freq: number; // 0~100 상대 빈도
-  icon: "home2" | "pin";
-};
-
-const PLACES: Place[] = [
+const PLACES = [
   { name: "집", desc: "매일 · 하루 평균 20시간", freq: 100, icon: "home2" },
   { name: "경로당", desc: "평일 · 오후 2–5시", freq: 74, icon: "pin" },
   { name: "서울숲 산책로", desc: "주 4회 · 오전", freq: 58, icon: "pin" },
   { name: "재래시장", desc: "주 2회 · 오전", freq: 34, icon: "pin" },
-];
+]
 
-// 방문 거점 3단계: core=생활 거점, peripheral=행동반경 근처 낯선 곳, rare=반경 밖 낯선 곳
-// SVG viewBox 400×400, 전체 행동반경 원: cx=200 cy=205 r=150
-const ACTIVITY_CLUSTERS: { x: number; y: number; r: number; tier: "core" | "peripheral" | "rare" }[] = [
-  { x: 200, y: 205, r: 42, tier: "core" },    // 집 (중심)
-  { x: 300, y: 150, r: 30, tier: "core" },    // 경로당 (반경 내 자주)
-  { x: 120, y: 120, r: 26, tier: "peripheral" }, // 산책로 (반경 경계, 친숙)
-  { x: 150, y: 300, r: 22, tier: "peripheral" }, // 재래시장 (반경 내 가끔)
-  { x: 358, y: 318, r: 18, tier: "rare" },    // 병원 (반경 밖, 낯선 곳)
-  { x: 52,  y: 326, r: 16, tier: "rare" },    // 마트 (반경 밖, 낯선 곳)
-];
+const ACTIVITY_CLUSTERS: {
+  x: number
+  y: number
+  r: number
+  tier: "core" | "peripheral" | "rare"
+}[] = [
+  { x: 200, y: 205, r: 42, tier: "core" },
+  { x: 300, y: 150, r: 30, tier: "core" },
+  { x: 120, y: 120, r: 26, tier: "peripheral" },
+  { x: 150, y: 300, r: 22, tier: "peripheral" },
+  { x: 358, y: 318, r: 18, tier: "rare" },
+  { x: 52, y: 326, r: 16, tier: "rare" },
+]
 
-// 방문 신호 기록 점 — 3단계 색 구분
-const ACTIVITY_DOTS: { x: number; y: number; tier: "core" | "peripheral" | "rare" }[] = [
-  // 생활 거점 (집·경로당 주변)
-  { x: 48, y: 50, tier: "core" }, { x: 52, y: 46, tier: "core" },
-  { x: 45, y: 54, tier: "core" }, { x: 55, y: 52, tier: "core" },
-  { x: 50, y: 48, tier: "core" }, { x: 53, y: 55, tier: "core" },
-  { x: 72, y: 36, tier: "core" }, { x: 76, y: 40, tier: "core" },
-  { x: 68, y: 39, tier: "core" }, { x: 74, y: 33, tier: "core" },
-  { x: 70, y: 38, tier: "core" }, { x: 73, y: 42, tier: "core" },
-  // 행동반경 근처·친숙 (amber — 산책로·재래시장 주변)
-  { x: 28, y: 28, tier: "peripheral" }, { x: 32, y: 32, tier: "peripheral" },
-  { x: 26, y: 33, tier: "peripheral" }, { x: 30, y: 26, tier: "peripheral" },
-  { x: 36, y: 74, tier: "peripheral" }, { x: 40, y: 78, tier: "peripheral" },
-  { x: 33, y: 72, tier: "peripheral" }, { x: 38, y: 76, tier: "peripheral" },
-  { x: 60, y: 40, tier: "peripheral" }, { x: 42, y: 62, tier: "peripheral" },
-  { x: 58, y: 62, tier: "peripheral" }, { x: 50, y: 66, tier: "peripheral" },
-  // 반경 밖 낯선 곳 (coral — 병원·마트 주변, 원 바깥)
-  { x: 88, y: 79, tier: "rare" }, { x: 91, y: 82, tier: "rare" },
-  { x: 86, y: 76, tier: "rare" }, { x: 89, y: 84, tier: "rare" },
-  { x: 12, y: 80, tier: "rare" }, { x: 15, y: 83, tier: "rare" },
-  { x: 10, y: 77, tier: "rare" }, { x: 13, y: 85, tier: "rare" },
-];
+const ACTIVITY_DOTS: {
+  x: number
+  y: number
+  tier: "core" | "peripheral" | "rare"
+}[] = [
+  { x: 48, y: 50, tier: "core" },
+  { x: 52, y: 46, tier: "core" },
+  { x: 45, y: 54, tier: "core" },
+  { x: 55, y: 52, tier: "core" },
+  { x: 50, y: 48, tier: "core" },
+  { x: 53, y: 55, tier: "core" },
+  { x: 72, y: 36, tier: "core" },
+  { x: 76, y: 40, tier: "core" },
+  { x: 68, y: 39, tier: "core" },
+  { x: 74, y: 33, tier: "core" },
+  { x: 70, y: 38, tier: "core" },
+  { x: 73, y: 42, tier: "core" },
+  { x: 28, y: 28, tier: "peripheral" },
+  { x: 32, y: 32, tier: "peripheral" },
+  { x: 26, y: 33, tier: "peripheral" },
+  { x: 30, y: 26, tier: "peripheral" },
+  { x: 36, y: 74, tier: "peripheral" },
+  { x: 40, y: 78, tier: "peripheral" },
+  { x: 33, y: 72, tier: "peripheral" },
+  { x: 38, y: 76, tier: "peripheral" },
+  { x: 60, y: 40, tier: "peripheral" },
+  { x: 42, y: 62, tier: "peripheral" },
+  { x: 58, y: 62, tier: "peripheral" },
+  { x: 50, y: 66, tier: "peripheral" },
+  { x: 88, y: 79, tier: "rare" },
+  { x: 91, y: 82, tier: "rare" },
+  { x: 86, y: 76, tier: "rare" },
+  { x: 89, y: 84, tier: "rare" },
+  { x: 12, y: 80, tier: "rare" },
+  { x: 15, y: 83, tier: "rare" },
+  { x: 10, y: 77, tier: "rare" },
+  { x: 13, y: 85, tier: "rare" },
+]
 
-type Segment = { label: string; from: number; to: number; out: boolean };
-
-const DAY_PATTERN: Record<"weekday" | "weekend", Segment[]> = {
+const DAY_PATTERN = {
   weekday: [
     { label: "집", from: 0, to: 9, out: false },
     { label: "산책", from: 9, to: 11, out: true },
@@ -1021,69 +994,17 @@ const DAY_PATTERN: Record<"weekday" | "weekend", Segment[]> = {
     { label: "공원", from: 10, to: 13, out: true },
     { label: "집", from: 13, to: 24, out: false },
   ],
-};
-
-function PatternAlertModal({ onClose }: { onClose: () => void }) {
-  useEffect(() => {
-    try {
-      navigator.vibrate?.([300, 150, 300]);
-    } catch {}
-  }, []);
-  return (
-    <div className="absolute inset-0 z-50 flex items-end justify-center bg-navy/60 backdrop-blur-sm">
-      <div className="animate-slide-up w-full overflow-hidden rounded-t-3xl bg-white">
-        <div className="animate-siren px-6 py-5 text-white">
-          <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20">
-              <Icon name="route" className="h-6 w-6" />
-            </span>
-            <div>
-              <p className="text-lg font-extrabold leading-tight">
-                평소 경로 이탈 감지
-              </p>
-              <p className="text-sm opacity-90">{PROTECTED.name}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4 px-6 pb-8 pt-5">
-          <p className="text-center text-xl font-extrabold text-navy">
-            평소 이동 경로를<br />
-            <span className="text-coral-dark">80% 이상</span> 벗어났습니다
-          </p>
-          <p className="rounded-2xl bg-coral-light px-4 py-3 text-center text-[13px] leading-relaxed text-coral-dark">
-            평소 가지 않던 방향으로 이동하고 있어요. 위치를 확인해 주세요.
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 rounded-2xl bg-gray-100 py-3.5 text-sm font-bold text-gray-700 transition active:scale-[.98]"
-            >
-              해제
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 rounded-2xl bg-coral py-3.5 text-sm font-bold text-white shadow-lg shadow-coral/30 transition active:scale-[.98]"
-            >
-              위치 확인
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
-  const [day, setDay] = useState<"weekday" | "weekend">("weekday");
-  const segments = DAY_PATTERN[day];
-  const nowHour = 15.3; // 데모 현재 시각
+  const [day, setDay] = useState<"weekday" | "weekend">("weekday")
+  const segments = DAY_PATTERN[day]
+  const nowHour = 15.3
 
   return (
     <div className="space-y-5">
       <SectionTitle title="활동 리포트" sub="최근 14일 분석" />
 
-      {/* 요약 카드 */}
       <div className="relative overflow-hidden rounded-3xl bg-mint p-6 text-white">
         <div className="absolute -right-8 -top-8 h-36 w-36 rounded-full bg-white/10" />
         <div className="relative flex items-center gap-3">
@@ -1096,47 +1017,68 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
           </div>
         </div>
         <p className="relative mt-4 text-[13px] leading-relaxed opacity-90">
-          김철수님은 평소 생활 리듬을 안정적으로 유지하고 있어요.
-          자주 가는 곳과 이동 경로를 학습해 이상 징후를 미리 살펴봐요.
+          김철수님은 평소 생활 리듬을 안정적으로 유지하고 있어요. 자주 가는 곳과
+          이동 경로를 학습해 이상 징후를 미리 살펴봐요.
         </p>
       </div>
 
-      {/* 행동반경 지도 — 주변 신호 기록으로 그린 생활 지도 */}
       <div>
         <SectionTitle title="행동반경 지도" sub="최근 14일 방문 기록" />
         <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
           <div className="relative aspect-square">
-            <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full">
+            <svg
+              viewBox="0 0 400 400"
+              className="absolute inset-0 h-full w-full"
+            >
               <rect width="400" height="400" fill="#EEF7F6" />
               {[70, 150, 230, 310].map((y) => (
-                <line key={`h${y}`} x1="0" y1={y} x2="400" y2={y} stroke="#DCEEEC" strokeWidth="8" />
+                <line
+                  key={`h${y}`}
+                  x1="0"
+                  y1={y}
+                  x2="400"
+                  y2={y}
+                  stroke="#DCEEEC"
+                  strokeWidth="8"
+                />
               ))}
               {[60, 150, 250, 340].map((x) => (
-                <line key={`v${x}`} x1={x} y1="0" x2={x} y2="400" stroke="#DCEEEC" strokeWidth="8" />
+                <line
+                  key={`v${x}`}
+                  x1={x}
+                  y1="0"
+                  x2={x}
+                  y2="400"
+                  stroke="#DCEEEC"
+                  strokeWidth="8"
+                />
               ))}
+              <circle
+                cx="200"
+                cy="205"
+                r="150"
+                fill="#2A9D8F10"
+                stroke="#2A9D8F"
+                strokeWidth="2"
+                strokeDasharray="7 6"
+              />
 
-              {/* 전체 행동반경 */}
-              <circle cx="200" cy="205" r="150" fill="#2A9D8F10" stroke="#2A9D8F" strokeWidth="2" strokeDasharray="7 6" />
-
-              {/* 방문 신호 밀집 구역 — 3단계 색 */}
               {ACTIVITY_CLUSTERS.map((c, i) => {
                 const [outer, inner] =
                   c.tier === "core"
                     ? ["#2A9D8F33", "#2A9D8F55"]
                     : c.tier === "peripheral"
-                    ? ["#F2BE5522", "#F2BE5540"]
-                    : ["#F0706026", "#F0706048"];
+                      ? ["#F2BE5522", "#F2BE5540"]
+                      : ["#F0706026", "#F0706048"]
                 return (
                   <g key={i}>
                     <circle cx={c.x} cy={c.y} r={c.r} fill={outer} />
                     <circle cx={c.x} cy={c.y} r={c.r * 0.55} fill={inner} />
                   </g>
-                );
+                )
               })}
-
             </svg>
 
-            {/* 신호 기록 점들 — 3단계 색 */}
             {ACTIVITY_DOTS.map((d, i) => (
               <span
                 key={i}
@@ -1144,40 +1086,45 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
                   d.tier === "core"
                     ? "h-2 w-2 bg-mint/70"
                     : d.tier === "peripheral"
-                    ? "h-1.5 w-1.5 bg-[#F2BE55]/80"
-                    : "h-1.5 w-1.5 bg-coral/75"
+                      ? "h-1.5 w-1.5 bg-[#F2BE55]/80"
+                      : "h-1.5 w-1.5 bg-coral/75"
                 }`}
                 style={{ left: `${d.x}%`, top: `${d.y}%` }}
               />
             ))}
 
-            {/* 장소 핀 — 3단계 색 */}
             {ACTIVITY_CLUSTERS.map((c, i) => {
               const bg =
                 c.tier === "core"
                   ? "bg-mint"
                   : c.tier === "peripheral"
-                  ? "bg-[#F2BE55]"
-                  : "bg-coral";
-              const icon = c.tier === "core" ? "home2" : "pin";
+                    ? "bg-[#F2BE55]"
+                    : "bg-coral"
               return (
                 <div
                   key={i}
                   className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
-                  style={{ left: `${(c.x / 400) * 100}%`, top: `${(c.y / 400) * 100}%` }}
+                  style={{
+                    left: `${(c.x / 400) * 100}%`,
+                    top: `${(c.y / 400) * 100}%`,
+                  }}
                 >
                   <span
                     className={`flex h-8 w-8 items-center justify-center rounded-full text-white shadow-md ${bg}`}
                   >
-                    <Icon name={icon} className="h-4 w-4" />
+                    <Icon
+                      name={c.tier === "core" ? "home2" : "pin"}
+                      className="h-4 w-4"
+                    />
                   </span>
                 </div>
-              );
+              )
             })}
 
-            {/* 반경 라벨 */}
             <div className="absolute left-3 top-3 rounded-2xl bg-white/85 px-3 py-2 backdrop-blur">
-              <p className="text-[11px] font-semibold text-gray-500">평소 행동반경</p>
+              <p className="text-[11px] font-semibold text-gray-500">
+                평소 행동반경
+              </p>
               <p className="text-2xl font-extrabold tabular-nums text-navy">
                 1.2<span className="text-sm">km</span>
               </p>
@@ -1189,7 +1136,8 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
               <span className="h-2.5 w-2.5 rounded-full bg-mint" /> 생활 거점
             </span>
             <span className="flex items-center gap-1.5 text-gray-500">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#F2BE55]" /> 반경 근처
+              <span className="h-2.5 w-2.5 rounded-full bg-[#F2BE55]" /> 반경
+              근처
             </span>
             <span className="flex items-center gap-1.5 text-gray-500">
               <span className="h-2.5 w-2.5 rounded-full bg-coral" /> 반경 밖
@@ -1197,11 +1145,11 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
           </div>
         </div>
         <p className="mt-2 px-1 text-[11px] leading-relaxed text-gray-400">
-          주변 기기 신호를 안전하게 수집해 자주 지나는 위치를 지도에 기록하고, 이를 바탕으로 평소 생활 반경을 그려요.
+          주변 기기 신호를 안전하게 수집해 자주 지나는 위치를 지도에 기록하고,
+          이를 바탕으로 평소 생활 반경을 그려요.
         </p>
       </div>
 
-      {/* 자주 머무는 장소 */}
       <div>
         <SectionTitle title="자주 머무는 곳" sub="자동 분석" />
         <div className="space-y-2.5">
@@ -1233,7 +1181,6 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
         </div>
       </div>
 
-      {/* 시간대별 안전 구역 (동적 지오펜스) */}
       <div>
         <SectionTitle title="시간대별 안전 구역" sub="자동 설정" />
         <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
@@ -1243,7 +1190,9 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
                 key={d}
                 onClick={() => setDay(d)}
                 className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
-                  day === d ? "bg-white text-mint-dark shadow-sm" : "text-gray-500"
+                  day === d
+                    ? "bg-white text-mint-dark shadow-sm"
+                    : "text-gray-500"
                 }`}
               >
                 {d === "weekday" ? "평일" : "주말"}
@@ -1251,7 +1200,6 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
             ))}
           </div>
 
-          {/* 24시간 타임라인 */}
           <div className="relative">
             <div className="flex h-9 w-full overflow-hidden rounded-lg">
               {segments.map((s, i) => (
@@ -1268,7 +1216,6 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
                 </div>
               ))}
             </div>
-            {/* 현재 시각 마커 */}
             <div
               className="absolute -top-1 bottom-0 w-0.5 bg-navy"
               style={{ left: `${(nowHour / 24) * 100}%` }}
@@ -1293,7 +1240,6 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
         </div>
       </div>
 
-      {/* 이상 패턴 선제 경보 */}
       <div>
         <SectionTitle title="평소 경로 이탈 경보" sub="선제 알림" />
         <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
@@ -1320,16 +1266,10 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-/* ============================================================
-   2) 재난문자 연동 탐색 지도
-   ============================================================ */
-
-/* ============================================================
-   3) 안심 리워드 (P2P 릴레이 지갑)
-   ============================================================ */
+/* ---------- 3) 안심 리워드 ---------- */
 
 function RewardScreen({
   points,
@@ -1339,33 +1279,38 @@ function RewardScreen({
   onScan,
   onRedeem,
 }: {
-  points: number;
-  rewards: Reward[];
-  relayOn: boolean;
-  setRelayOn: (v: boolean) => void;
-  onScan: () => void;
-  onRedeem: (item: ShopItem) => void;
+  points: number
+  rewards: Reward[]
+  relayOn: boolean
+  setRelayOn: (v: boolean) => void
+  onScan: () => void
+  onRedeem: (item: ShopItem) => void
 }) {
-  const [purchased, setPurchased] = useState<ShopItem | null>(null);
-  const [hours, setHours] = useState(4.5); // 1365 연계 누적 봉사시간
-  const [synced, setSynced] = useState(false);
+  const [purchased, setPurchased] = useState<ShopItem | null>(null)
+  const [hours, setHours] = useState(4.5)
+  const [synced, setSynced] = useState(false)
 
-  const CONVERT_COST = 1000; // 1,000P = 30분
-  const canConvert = points >= CONVERT_COST;
+  const CONVERT_COST = 1000
+  const canConvert = points >= CONVERT_COST
 
   function buy(item: ShopItem) {
-    if (points < item.cost) return;
-    onRedeem(item);
-    setPurchased(item);
-    setTimeout(() => setPurchased(null), 2200);
+    if (points < item.cost) return
+    onRedeem(item)
+    setPurchased(item)
+    setTimeout(() => setPurchased(null), 2200)
   }
 
   function convertToHours() {
-    if (!canConvert) return;
-    onRedeem({ id: "vol", brand: "1365", name: "봉사시간 전환", cost: CONVERT_COST });
-    setHours((h) => Math.round((h + 0.5) * 10) / 10);
-    setSynced(true);
-    setTimeout(() => setSynced(false), 2200);
+    if (!canConvert) return
+    onRedeem({
+      id: "vol",
+      brand: "1365",
+      name: "봉사시간 전환",
+      cost: CONVERT_COST,
+    })
+    setHours((h) => Math.round((h + 0.5) * 10) / 10)
+    setSynced(true)
+    setTimeout(() => setSynced(false), 2200)
   }
 
   return (
@@ -1404,7 +1349,9 @@ function RewardScreen({
           <div className="flex items-center gap-3">
             <div
               className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
-                relayOn ? "bg-mint-light text-mint-dark" : "bg-gray-100 text-gray-400"
+                relayOn
+                  ? "bg-mint-light text-mint-dark"
+                  : "bg-gray-100 text-gray-400"
               }`}
             >
               <Icon name="broadcast" className="h-5 w-5" />
@@ -1416,26 +1363,13 @@ function RewardScreen({
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setRelayOn(!relayOn)}
-            className={`relative h-7 w-12 rounded-full transition-colors ${
-              relayOn ? "bg-mint" : "bg-gray-200"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${
-                relayOn ? "left-[22px]" : "left-0.5"
-              }`}
-            />
-          </button>
+          <Toggle checked={relayOn} onChange={() => setRelayOn(!relayOn)} />
         </div>
 
         {relayOn && (
           <div className="animate-fade-in mt-3 flex items-center gap-2 rounded-xl bg-mint-light px-3 py-2.5 text-mint-dark">
             <Icon name="search" className="animate-scan h-4 w-4 shrink-0" />
-            <p className="text-xs font-semibold">
-              주변을 안심 스캔하고 있어요
-            </p>
+            <p className="text-xs font-semibold">주변을 안심 스캔하고 있어요</p>
           </div>
         )}
 
@@ -1448,7 +1382,6 @@ function RewardScreen({
         </button>
       </div>
 
-      {/* 1365 자원봉사 연계 */}
       <div>
         <SectionTitle title="봉사시간 적립" sub="1365 자원봉사포털 연계" />
         <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
@@ -1459,7 +1392,8 @@ function RewardScreen({
             <div className="flex-1">
               <p className="text-xs opacity-80">1365 누적 봉사시간</p>
               <p className="text-2xl font-extrabold tabular-nums">
-                {hours.toFixed(1)}<span className="ml-0.5 text-sm">시간</span>
+                {hours.toFixed(1)}
+                <span className="ml-0.5 text-sm">시간</span>
               </p>
             </div>
             <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
@@ -1471,8 +1405,9 @@ function RewardScreen({
             <div className="flex items-start gap-2.5 rounded-2xl bg-mint-light px-3.5 py-3 text-mint-dark">
               <Icon name="broadcast" className="mt-0.5 h-4 w-4 shrink-0" />
               <p className="text-xs leading-relaxed">
-                안심 스캔으로 실종자 찾기에 참여하면 활동이 봉사활동으로 인정돼요.
-                1,000P를 30분 봉사시간으로 전환해 1365 실적에 자동 반영합니다.
+                안심 스캔으로 실종자 찾기에 참여하면 활동이 봉사활동으로
+                인정돼요. 1,000P를 30분 봉사시간으로 전환해 1365 실적에 자동
+                반영합니다.
               </p>
             </div>
 
@@ -1492,18 +1427,19 @@ function RewardScreen({
                 canConvert ? "bg-navy text-white" : "bg-gray-100 text-gray-400"
               }`}
             >
-              {canConvert ? "1,000P → 봉사시간 30분 전환" : "포인트 부족 (1,000P 필요)"}
+              {canConvert
+                ? "1,000P → 봉사시간 30분 전환"
+                : "포인트 부족 (1,000P 필요)"}
             </button>
           </div>
         </div>
       </div>
 
-      {/* 기프티콘 상점 */}
       <div>
         <SectionTitle title="리워드 상점" sub="포인트로 교환" />
         <div className="grid grid-cols-2 gap-3">
           {SHOP_ITEMS.map((item) => {
-            const affordable = points >= item.cost;
+            const affordable = points >= item.cost
             return (
               <div
                 key={item.id}
@@ -1534,7 +1470,7 @@ function RewardScreen({
                   {affordable ? "교환하기" : "포인트 부족"}
                 </button>
               </div>
-            );
+            )
           })}
         </div>
       </div>
@@ -1564,31 +1500,52 @@ function RewardScreen({
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-/* ============================================================
-   상단바: 메뉴 드로어 · 메뉴 상세 · 알림 패널
-   ============================================================ */
+/* ---------- 사이드 패널 & 서브페이지 ---------- */
 
-const MENU_ITEMS: { key: string; label: string; sub: string; icon: "person" | "home2" | "settings" | "store" }[] = [
-  { key: "프로필", label: "프로필", sub: "보호 대상 · 착코어 정보", icon: "person" },
-  { key: "마이페이지", label: "마이페이지", sub: "구독 · 리워드 · 주문 내역", icon: "home2" },
-  { key: "간단한 설정", label: "간단한 설정", sub: "알림 · 안전반경 · 개인정보", icon: "settings" },
-  { key: "자사몰", label: "자사몰", sub: "착코어 · 액세서리 구매", icon: "store" },
-];
+const MENU_ITEMS = [
+  {
+    key: "프로필",
+    label: "프로필",
+    sub: "보호 대상 · 착코어 정보",
+    icon: "person",
+  },
+  {
+    key: "마이페이지",
+    label: "마이페이지",
+    sub: "구독 · 리워드 · 주문 내역",
+    icon: "home2",
+  },
+  {
+    key: "간단한 설정",
+    label: "간단한 설정",
+    sub: "알림 · 안전반경 · 개인정보",
+    icon: "settings",
+  },
+  {
+    key: "자사몰",
+    label: "자사몰",
+    sub: "착코어 · 액세서리 구매",
+    icon: "store",
+  },
+]
 
 function Drawer({
   onClose,
   onOpenPage,
 }: {
-  onClose: () => void;
-  onOpenPage: (page: string) => void;
+  onClose: () => void
+  onOpenPage: (page: string) => void
 }) {
   return (
     <div className="absolute inset-0 z-40 flex">
-      <div className="animate-fade-in absolute inset-0 bg-navy/30" onClick={onClose} />
-      <div className="animate-slide-up relative flex h-full w-[80%] max-w-[320px] flex-col bg-white shadow-2xl">
+      <div
+        className="animate-fade-in absolute inset-0 bg-navy/30"
+        onClick={onClose}
+      />
+      <div className="animate-slide-up relative flex h-full w-[80%] max-w-80 flex-col bg-white shadow-2xl">
         <div className="flex items-center gap-3 border-b border-gray-100 bg-mint-light px-5 py-6">
           <div className="h-14 w-14 rounded-full bg-gray-200" />
           <div>
@@ -1607,7 +1564,9 @@ function Drawer({
                 <Icon name={m.icon} className="h-5 w-5" />
               </span>
               <span className="flex-1">
-                <span className="block text-sm font-bold text-navy">{m.label}</span>
+                <span className="block text-sm font-bold text-navy">
+                  {m.label}
+                </span>
                 <span className="block text-xs text-gray-500">{m.sub}</span>
               </span>
               <Icon name="chevron" className="h-4 w-4 text-gray-300" />
@@ -1617,11 +1576,15 @@ function Drawer({
         <p className="px-5 py-4 text-[11px] text-gray-400">ChakCare v1.0.0</p>
       </div>
     </div>
-  );
+  )
 }
 
-function MenuPage({ page, onClose }: { page: string; onClose: () => void }) {
-  const meta = MENU_ITEMS.find((m) => m.key === page);
+type MenuPageProps = {
+  page: string
+  onClose: () => void
+}
+
+function MenuPage({ page, onClose }: MenuPageProps) {
   return (
     <div className="animate-fade-in absolute inset-0 z-50 flex flex-col bg-gray-50">
       <header className="flex items-center gap-3 border-b border-gray-100 bg-white/90 px-4 py-3.5 backdrop-blur">
@@ -1641,7 +1604,9 @@ function MenuPage({ page, onClose }: { page: string; onClose: () => void }) {
               <div>
                 <p className="text-lg font-extrabold text-navy">김철수</p>
                 <p className="text-sm text-gray-500">아들 · 만 7세</p>
-                <p className="mt-1 text-xs text-mint-dark">착코어 A · B 연결됨</p>
+                <p className="mt-1 text-xs text-mint-dark">
+                  착코어 A · B 연결됨
+                </p>
               </div>
             </div>
             {[
@@ -1650,7 +1615,10 @@ function MenuPage({ page, onClose }: { page: string; onClose: () => void }) {
               ["기본 안전반경", "30m"],
               ["특이사항", "파란 점퍼 착용"],
             ].map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm ring-1 ring-gray-100">
+              <div
+                key={k}
+                className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm ring-1 ring-gray-100"
+              >
                 <span className="text-sm text-gray-500">{k}</span>
                 <span className="text-sm font-bold text-navy">{v}</span>
               </div>
@@ -1669,7 +1637,10 @@ function MenuPage({ page, onClose }: { page: string; onClose: () => void }) {
               ["누적 안심 제보", "27회"],
               ["최근 주문", "착코어 B · 배송완료"],
             ].map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm ring-1 ring-gray-100">
+              <div
+                key={k}
+                className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm ring-1 ring-gray-100"
+              >
                 <span className="text-sm text-gray-500">{k}</span>
                 <span className="text-sm font-bold text-navy">{v}</span>
               </div>
@@ -1685,11 +1656,12 @@ function MenuPage({ page, onClose }: { page: string; onClose: () => void }) {
               ["주변 안심 스캔", true],
               ["진동", false],
             ].map(([k, on]) => (
-              <div key={k as string} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm ring-1 ring-gray-100">
+              <div
+                key={k as string}
+                className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm ring-1 ring-gray-100"
+              >
                 <span className="text-sm font-semibold text-navy">{k}</span>
-                <span className={`relative h-7 w-12 rounded-full ${on ? "bg-mint" : "bg-gray-200"}`}>
-                  <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow ${on ? "left-[22px]" : "left-0.5"}`} />
-                </span>
+                <Toggle checked={Boolean(on)} onChange={() => {}} />
               </div>
             ))}
           </div>
@@ -1697,8 +1669,12 @@ function MenuPage({ page, onClose }: { page: string; onClose: () => void }) {
         {page === "자사몰" && (
           <div className="space-y-4">
             <div className="rounded-3xl bg-coral-light p-5 ring-1 ring-coral/20">
-              <p className="text-sm font-extrabold text-coral-dark">신규 회원 첫 구매 15% 할인</p>
-              <p className="mt-1 text-xs text-gray-500">착코어 스타터 키트를 만나보세요</p>
+              <p className="text-sm font-extrabold text-coral-dark">
+                신규 회원 첫 구매 15% 할인
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                착코어 스타터 키트를 만나보세요
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -1707,7 +1683,10 @@ function MenuPage({ page, onClose }: { page: string; onClose: () => void }) {
                 ["신발 부착 클립", "6,500원"],
                 ["가방 태그", "5,900원"],
               ].map(([n, p]) => (
-                <div key={n} className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
+                <div
+                  key={n}
+                  className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-100"
+                >
                   <div className="mb-2 aspect-square rounded-xl bg-gray-200" />
                   <p className="text-xs font-bold text-navy">{n}</p>
                   <p className="text-sm font-extrabold text-mint-dark">{p}</p>
@@ -1718,21 +1697,48 @@ function MenuPage({ page, onClose }: { page: string; onClose: () => void }) {
         )}
       </div>
     </div>
-  );
+  )
 }
 
-const NOTIFS: { icon: "alert" | "route" | "gift" | "megaphone"; tone: "coral" | "mint"; title: string; body: string; ts: string }[] = [
-  { icon: "route", tone: "coral", title: "평소 경로 이탈 감지", body: "평소 이동 경로를 80% 이상 벗어났습니다.", ts: "5분 전" },
-  { icon: "gift", tone: "mint", title: "안심 리워드 적립", body: "실종자 찾기 제보로 +500P가 적립됐어요.", ts: "오늘 14:20" },
-  { icon: "megaphone", tone: "coral", title: "실종경보 수신", body: "성동구 실종아동 발생 · 주변 안심 스캔이 켜졌어요.", ts: "오늘 13:02" },
-  { icon: "alert", tone: "mint", title: "안전반경 복귀", body: "김철수 님이 안전반경 안으로 돌아왔어요.", ts: "어제 18:40" },
-];
+const NOTIFS = [
+  {
+    icon: "route",
+    tone: "coral",
+    title: "평소 경로 이탈 감지",
+    body: "평소 이동 경로를 80% 이상 벗어났습니다.",
+    ts: "5분 전",
+  },
+  {
+    icon: "gift",
+    tone: "mint",
+    title: "안심 리워드 적립",
+    body: "실종자 찾기 제보로 +500P가 적립됐어요.",
+    ts: "오늘 14:20",
+  },
+  {
+    icon: "megaphone",
+    tone: "coral",
+    title: "실종경보 수신",
+    body: "성동구 실종아동 발생 · 주변 안심 스캔이 켜졌어요.",
+    ts: "오늘 13:02",
+  },
+  {
+    icon: "alert",
+    tone: "mint",
+    title: "안전반경 복귀",
+    body: "김철수 님이 안전반경 안으로 돌아왔어요.",
+    ts: "어제 18:40",
+  },
+]
 
 function NotificationPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="absolute inset-0 z-40 flex justify-end">
-      <div className="animate-fade-in absolute inset-0 bg-navy/30" onClick={onClose} />
-      <div className="animate-slide-up relative flex h-full w-[86%] max-w-[340px] flex-col bg-gray-50 shadow-2xl">
+      <div
+        className="animate-fade-in absolute inset-0 bg-navy/30"
+        onClick={onClose}
+      />
+      <div className="animate-slide-up relative flex h-full w-[86%] max-w-85 flex-col bg-gray-50 shadow-2xl">
         <header className="flex items-center justify-between border-b border-gray-100 bg-white/90 px-5 py-3.5 backdrop-blur">
           <p className="text-base font-extrabold text-navy">알림</p>
           <button
@@ -1744,10 +1750,15 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
         </header>
         <div className="flex-1 space-y-2.5 overflow-y-auto p-4">
           {NOTIFS.map((n, i) => (
-            <div key={i} className="flex gap-3 rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100">
+            <div
+              key={i}
+              className="flex gap-3 rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100"
+            >
               <span
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
-                  n.tone === "coral" ? "bg-coral-light text-coral-dark" : "bg-mint-light text-mint-dark"
+                  n.tone === "coral"
+                    ? "bg-coral-light text-coral-dark"
+                    : "bg-mint-light text-mint-dark"
                 }`}
               >
                 <Icon name={n.icon} className="h-5 w-5" />
@@ -1755,46 +1766,44 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
               <div className="flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-bold text-navy">{n.title}</p>
-                  <span className="shrink-0 text-[10px] text-gray-400">{n.ts}</span>
+                  <span className="shrink-0 text-[10px] text-gray-400">
+                    {n.ts}
+                  </span>
                 </div>
-                <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{n.body}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                  {n.body}
+                </p>
               </div>
             </div>
           ))}
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-/* ============================================================
-   앱 셸 + 네비게이션
-   ============================================================ */
+/* ---------- 메인 앱 ---------- */
 
-const TABS: {
-  key: TabKey;
-  label: string;
-  icon: "home" | "map" | "chart" | "wallet";
-}[] = [
-  { key: "home", label: "홈", icon: "home" },
-  { key: "live", label: "라이브 지도", icon: "map" },
-  { key: "report", label: "리포트", icon: "chart" },
-  { key: "reward", label: "리워드", icon: "wallet" },
-];
+const TABS = [
+  { key: "home" as TabKey, label: "홈", icon: "home" },
+  { key: "live" as TabKey, label: "라이브 지도", icon: "map" },
+  { key: "report" as TabKey, label: "리포트", icon: "chart" },
+  { key: "reward" as TabKey, label: "리워드", icon: "wallet" },
+]
 
 export default function App() {
-  const [tab, setTab] = useState<TabKey>("home");
-  const [radius, setRadius] = useState(30);
-  const [points, setPoints] = useState(3500);
-  const [relayOn, setRelayOn] = useState(true);
+  const [tab, setTab] = useState<TabKey>("home")
+  const [radius, setRadius] = useState(30)
+  const [points, setPoints] = useState(3500)
+  const [relayOn, setRelayOn] = useState(true)
   const [activeAlert, setActiveAlert] = useState<{
-    core: Core;
-    distance: number;
-  } | null>(null);
-  const [patternAlert, setPatternAlert] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [menuPage, setMenuPage] = useState<null | string>(null);
+    core: Core
+    distance: number
+  } | null>(null)
+  const [patternAlert, setPatternAlert] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [menuPage, setMenuPage] = useState<null | string>(null)
 
   const [cores, setCores] = useState<Core[]>([
     {
@@ -1813,7 +1822,7 @@ export default function App() {
       monitoring: false,
       rssi: -71,
     },
-  ]);
+  ])
 
   const [rewards, setRewards] = useState<Reward[]>([
     {
@@ -1837,14 +1846,14 @@ export default function App() {
       area: "서울숲 공원",
       points: 500,
     },
-  ]);
+  ])
 
   function triggerAlert(core: Core, distance: number) {
-    setActiveAlert({ core, distance });
+    setActiveAlert({ core, distance })
   }
 
   function handleScan() {
-    setPoints((p) => p + 500);
+    setPoints((p) => p + 500)
     setRewards((prev) => [
       {
         id: `r${Date.now()}`,
@@ -1854,17 +1863,16 @@ export default function App() {
         points: 500,
       },
       ...prev,
-    ]);
+    ])
   }
 
   function handleRedeem(item: ShopItem) {
-    setPoints((p) => Math.max(0, p - item.cost));
+    setPoints((p) => Math.max(0, p - item.cost))
   }
 
   return (
     <div className="flex h-full w-full items-center justify-center bg-gray-100 p-0 sm:p-6">
-      {/* 모바일 프레임 */}
-      <div className="relative flex h-full w-full max-w-[440px] flex-col overflow-hidden bg-gray-50 shadow-2xl sm:h-[900px] sm:rounded-[2.5rem]">
+      <div className="relative flex h-full w-full max-w-110 flex-col overflow-hidden bg-gray-50 shadow-2xl sm:h-225 sm:rounded-[2.5rem]">
         {/* 상단 헤더 */}
         <header className="flex items-center justify-between border-b border-gray-100 bg-white/90 px-4 py-3.5 backdrop-blur">
           <button
@@ -1925,7 +1933,7 @@ export default function App() {
         {/* 하단 탭바 */}
         <nav className="grid grid-cols-4 border-t border-gray-100 bg-white/95 px-1.5 pb-2 pt-1.5 backdrop-blur">
           {TABS.map((t) => {
-            const on = tab === t.key;
+            const on = tab === t.key
             return (
               <button
                 key={t.key}
@@ -1948,43 +1956,50 @@ export default function App() {
                   {t.label}
                 </span>
               </button>
-            );
+            )
           })}
         </nav>
 
-        {/* 비상 경보 모달 */}
+        {/* 모달 & 오버레이 */}
         {activeAlert && (
           <AlertModal
             core={activeAlert.core}
             distance={activeAlert.distance}
             radius={radius}
             onClose={() => setActiveAlert(null)}
-          />
-        )}
-
-        {patternAlert && (
-          <PatternAlertModal onClose={() => setPatternAlert(false)} />
-        )}
-
-        {/* 왼쪽 메뉴 드로어 */}
-        {drawerOpen && (
-          <Drawer
-            onClose={() => setDrawerOpen(false)}
-            onOpenPage={(p) => {
-              setMenuPage(p);
-              setDrawerOpen(false);
+            onViewLocation={() => {
+              setActiveAlert(null)
+              setTab("live")
             }}
           />
         )}
 
-        {/* 메뉴 상세 페이지 */}
+        {patternAlert && (
+          <PatternAlertModal
+            onClose={() => setPatternAlert(false)}
+            onViewLocation={() => {
+              setPatternAlert(false)
+              setTab("live")
+            }}
+          />
+        )}
+
+        {drawerOpen && (
+          <Drawer
+            onClose={() => setDrawerOpen(false)}
+            onOpenPage={(p) => {
+              setMenuPage(p)
+              setDrawerOpen(false)
+            }}
+          />
+        )}
+
         {menuPage && (
           <MenuPage page={menuPage} onClose={() => setMenuPage(null)} />
         )}
 
-        {/* 오른쪽 알림 패널 */}
         {notifOpen && <NotificationPanel onClose={() => setNotifOpen(false)} />}
       </div>
     </div>
-  );
+  )
 }
