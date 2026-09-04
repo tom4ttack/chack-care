@@ -1287,30 +1287,12 @@ function RewardScreen({
   onRedeem: (item: ShopItem) => void
 }) {
   const [purchased, setPurchased] = useState<ShopItem | null>(null)
-  const [hours, setHours] = useState(4.5)
-  const [synced, setSynced] = useState(false)
-
-  const CONVERT_COST = 1000
-  const canConvert = points >= CONVERT_COST
 
   function buy(item: ShopItem) {
     if (points < item.cost) return
     onRedeem(item)
     setPurchased(item)
     setTimeout(() => setPurchased(null), 2200)
-  }
-
-  function convertToHours() {
-    if (!canConvert) return
-    onRedeem({
-      id: "vol",
-      brand: "1365",
-      name: "봉사시간 전환",
-      cost: CONVERT_COST,
-    })
-    setHours((h) => Math.round((h + 0.5) * 10) / 10)
-    setSynced(true)
-    setTimeout(() => setSynced(false), 2200)
   }
 
   return (
@@ -1380,59 +1362,6 @@ function RewardScreen({
         >
           안심 활동 적립하기 (+500P)
         </button>
-      </div>
-
-      <div>
-        <SectionTitle title="봉사시간 적립" sub="1365 자원봉사포털 연계" />
-        <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
-          <div className="flex items-center gap-3 bg-mint px-5 py-4 text-white">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15">
-              <Icon name="check" className="h-5 w-5" />
-            </span>
-            <div className="flex-1">
-              <p className="text-xs opacity-80">1365 누적 봉사시간</p>
-              <p className="text-2xl font-extrabold tabular-nums">
-                {hours.toFixed(1)}
-                <span className="ml-0.5 text-sm">시간</span>
-              </p>
-            </div>
-            <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold">
-              계정 연동됨
-            </span>
-          </div>
-
-          <div className="p-4">
-            <div className="flex items-start gap-2.5 rounded-2xl bg-mint-light px-3.5 py-3 text-mint-dark">
-              <Icon name="broadcast" className="mt-0.5 h-4 w-4 shrink-0" />
-              <p className="text-xs leading-relaxed">
-                안심 스캔으로 실종자 찾기에 참여하면 활동이 봉사활동으로
-                인정돼요. 1,000P를 30분 봉사시간으로 전환해 1365 실적에 자동
-                반영합니다.
-              </p>
-            </div>
-
-            {synced && (
-              <div className="animate-fade-in mt-3 flex items-center gap-2 rounded-xl bg-navy px-3 py-2.5 text-white">
-                <Icon name="check" className="h-4 w-4 shrink-0" />
-                <p className="text-xs font-semibold">
-                  30분이 1365 봉사실적으로 전송됐어요
-                </p>
-              </div>
-            )}
-
-            <button
-              onClick={convertToHours}
-              disabled={!canConvert}
-              className={`mt-3 w-full rounded-xl py-2.5 text-sm font-bold transition active:scale-[.98] ${
-                canConvert ? "bg-navy text-white" : "bg-gray-100 text-gray-400"
-              }`}
-            >
-              {canConvert
-                ? "1,000P → 봉사시간 30분 전환"
-                : "포인트 부족 (1,000P 필요)"}
-            </button>
-          </div>
-        </div>
       </div>
 
       <div>
