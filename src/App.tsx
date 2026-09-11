@@ -30,7 +30,7 @@ type ShopItem = {
 
 type TabKey = "home" | "live" | "report" | "reward"
 
-const PROTECTED = { name: "김철수", relation: "부 · 만 74세" }
+const PROTECTED = { name: "김서준", relation: "아들 · 만 8세" }
 
 const SHOP_ITEMS: ShopItem[] = [
   { id: "s1", brand: "카페", name: "아메리카노 Tall", cost: 4500 },
@@ -922,10 +922,10 @@ function LiveMapScreen({
 /* ---------- 2) 활동 리포트 ---------- */
 
 const PLACES = [
-  { name: "집", desc: "매일 · 하루 평균 20시간", freq: 100, icon: "home2" },
-  { name: "경로당", desc: "평일 · 오후 2–5시", freq: 74, icon: "pin" },
-  { name: "서울숲 산책로", desc: "주 4회 · 오전", freq: 58, icon: "pin" },
-  { name: "재래시장", desc: "주 2회 · 오전", freq: 34, icon: "pin" },
+  { name: "집", desc: "매일 · 하루 평균 14시간", freq: 100, icon: "home2" },
+  { name: "유치원", desc: "평일 · 9–14시", freq: 74, icon: "pin" },
+  { name: "영어학원", desc: "주 4회 · 15-17시", freq: 58, icon: "pin" },
+  { name: "놀이터", desc: "주 2회 · 14-15시", freq: 34, icon: "pin" },
 ]
 
 const ACTIVITY_CLUSTERS: {
@@ -984,14 +984,14 @@ const ACTIVITY_DOTS: {
 const DAY_PATTERN = {
   weekday: [
     { label: "집", from: 0, to: 9, out: false },
-    { label: "산책", from: 9, to: 11, out: true },
+    { label: "유치원", from: 9, to: 11, out: true },
     { label: "집", from: 11, to: 14, out: false },
-    { label: "경로당", from: 14, to: 17, out: true },
+    { label: "영어학원", from: 14, to: 17, out: true },
     { label: "집", from: 17, to: 24, out: false },
   ],
   weekend: [
     { label: "집", from: 0, to: 10, out: false },
-    { label: "공원", from: 10, to: 13, out: true },
+    { label: "놀이터", from: 10, to: 13, out: true },
     { label: "집", from: 13, to: 24, out: false },
   ],
 }
@@ -1017,7 +1017,7 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
           </div>
         </div>
         <p className="relative mt-4 text-[13px] leading-relaxed opacity-90">
-          김철수님은 평소 생활 리듬을 안정적으로 유지하고 있어요. 자주 가는 곳과
+          김서준님은 평소 생활 리듬을 안정적으로 유지하고 있어요. 자주 가는 곳과
           이동 경로를 학습해 이상 징후를 미리 살펴봐요.
         </p>
       </div>
@@ -1531,8 +1531,8 @@ function MenuPage({ page, onClose }: MenuPageProps) {
             <div className="flex items-center gap-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
               <div className="h-20 w-20 shrink-0 rounded-2xl bg-gray-200" />
               <div>
-                <p className="text-lg font-extrabold text-navy">김철수</p>
-                <p className="text-sm text-gray-500">아들 · 만 7세</p>
+                <p className="text-lg font-extrabold text-navy">김서준</p>
+                <p className="text-sm text-gray-500">아들 · 만 8세</p>
                 <p className="mt-1 text-xs text-mint-dark">
                   착코어 A · B 연결됨
                 </p>
@@ -1542,7 +1542,7 @@ function MenuPage({ page, onClose }: MenuPageProps) {
               ["보호자", "김보호 (엄마)"],
               ["비상 연락처", "010-1234-5678"],
               ["기본 안전반경", "30m"],
-              ["특이사항", "파란 점퍼 착용"],
+              ["특이사항", "노란 자켓 착용"],
             ].map(([k, v]) => (
               <div
                 key={k}
