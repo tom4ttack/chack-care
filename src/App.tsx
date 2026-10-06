@@ -102,6 +102,26 @@ function BatteryBar({ level }: { level: number }) {
   )
 }
 
+function SignalBars({ rssi }: { rssi: number | null | undefined }) {
+  const level = rssi == null ? 0 : rssi >= -65 ? 3 : rssi >= -80 ? 2 : 1
+  return (
+    <span className="inline-flex items-end gap-2">
+      <span className="flex items-end gap-0.5" aria-hidden>
+        {[8, 14, 20].map((h, i) => (
+          <span
+            key={h}
+            className={`w-1.5 rounded-sm bg-current ${i < level ? "" : "opacity-20"}`}
+            style={{ height: h }}
+          />
+        ))}
+      </span>
+      <span className="text-sm font-bold">
+        {["신호 없음", "약함", "보통", "강함"][level]}
+      </span>
+    </span>
+  )
+}
+
 function SectionTitle({ title, sub }: { title: string; sub?: string }) {
   return (
     <div className="mb-3 flex items-end justify-between">
@@ -255,7 +275,7 @@ function AlertModal({
     >
       <div className="grid grid-cols-3 gap-3 text-center">
         {[
-          { k: "마지막 신호", v: event.rssi != null ? `${event.rssi}dBm` : "–", hot: true },
+          { k: "수신 신호", v: <SignalBars rssi={event.rssi} />, hot: true },
           { k: "안전반경", v: `${radius}m`, hot: false },
           { k: "경과", v: `${seconds}s`, hot: false },
         ].map((s) => (
@@ -540,15 +560,12 @@ function LiveMapScreen({
 
         <div className="absolute bottom-3 left-3 rounded-2xl bg-white/85 px-3 py-2 backdrop-blur">
           <p className="text-[11px] font-semibold text-gray-500">
-            마지막 수신 신호
+            수신 신호
           </p>
           <p
-            className={`text-2xl font-extrabold tabular-nums ${
-              breach ? "text-coral-dark" : "text-navy"
-            }`}
+            className={`mt-1 ${breach ? "text-coral-dark" : "text-navy"}`}
           >
-            {monitoringOn && latest?.rssi != null ? latest.rssi : "–"}
-            <span className="text-sm"> dBm</span>
+            <SignalBars rssi={monitoringOn ? latest?.rssi : null} />
           </p>
         </div>
 
