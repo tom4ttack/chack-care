@@ -1443,7 +1443,9 @@ export default function App() {
             className="relative flex h-9 w-9 items-center justify-center rounded-xl text-navy transition active:scale-90 active:bg-gray-100"
           >
             <Icon name="bell" className="h-6 w-6" />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-coral ring-2 ring-white" />
+            {events.length > 0 && (
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-coral ring-2 ring-white" />
+            )}
           </button>
         </header>
 
