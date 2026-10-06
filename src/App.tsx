@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { supabase, type EventRow } from "./lib/supabase"
+import { useBeaconStatus, type BeaconStatus } from "./lib/useBeaconStatus"
 
 /* ============================================================
    착케어 (ChakCare) — 실종·분실 방지 스마트 앱
@@ -11,6 +12,7 @@ type Core = {
   battery: number
   connected: boolean
   monitoring: boolean
+  subject?: string
 }
 
 type Reward = { id: string; ts: string; label: string; area: string; points: number }
@@ -98,6 +100,42 @@ function BatteryBar({ level }: { level: number }) {
       <span className="text-xs font-semibold tabular-nums text-gray-700">
         {level}%
       </span>
+    </div>
+  )
+}
+
+const LEVEL = {
+  ok: { label: "정상", dot: "bg-mint", text: "text-mint-dark" },
+  warn: { label: "주의", dot: "bg-[#F2BE55]", text: "text-gray-700" },
+  low: { label: "교체 필요", dot: "bg-coral", text: "text-coral-dark" },
+}
+
+function BatteryBadge({
+  core,
+  beacons,
+  onDark,
+}: {
+  core: Core
+  beacons: Record<string, BeaconStatus>
+  onDark?: boolean
+}) {
+  if (!core.subject) return <BatteryBar level={core.battery} />
+  const s = beacons[core.subject]
+  if (!s)
+    return (
+      <span className={`text-xs ${onDark ? "opacity-80" : "text-gray-400"}`}>
+        배터리 확인 중
+      </span>
+    )
+  const l = LEVEL[s.level]
+  const mins = Math.max(0, Math.round((Date.now() - new Date(s.updated_at).getTime()) / 60000))
+  return (
+    <div className="text-right">
+      <p className={`flex items-center justify-end gap-1.5 text-xs font-bold ${onDark ? "" : l.text}`}>
+        <span className={`h-2 w-2 rounded-full ${onDark ? "bg-white" : l.dot}`} />
+        {l.label} · {(s.battery_mv / 1000).toFixed(2)}V
+      </p>
+      <p className={`text-[10px] ${onDark ? "opacity-80" : "text-gray-400"}`}>{mins}분 전</p>
     </div>
   )
 }
@@ -307,12 +345,14 @@ function AlertModal({
 
 function HomeScreen({
   cores,
+  beacons,
   radius,
   points,
   relayOn,
   onGo,
 }: {
   cores: Core[]
+  beacons: Record<string, BeaconStatus>
   radius: number
   points: number
   relayOn: boolean
@@ -395,7 +435,7 @@ function HomeScreen({
                   </p>
                 </div>
               </div>
-              <BatteryBar level={c.battery} />
+              <BatteryBadge core={c} beacons={beacons} />
             </div>
           ))}
         </div>
@@ -423,6 +463,7 @@ function HomeScreen({
 /* ---------- 1) 지오펜스 라이브 지도 ---------- */
 
 function LiveMapScreen({
+  beacons,
   radius,
   setRadius,
   cores,
@@ -431,6 +472,7 @@ function LiveMapScreen({
   relayOn,
   setRelayOn,
 }: {
+  beacons: Record<string, BeaconStatus>
   radius: number
   setRadius: (r: number) => void
   cores: Core[]
@@ -473,7 +515,7 @@ function LiveMapScreen({
         </div>
         <div className="text-right">
           <p className="text-[11px] opacity-80">디바이스</p>
-          <BatteryBar level={active.battery} />
+          <BatteryBadge core={active} beacons={beacons} onDark />
         </div>
       </div>
 
@@ -667,7 +709,7 @@ function LiveMapScreen({
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <BatteryBar level={c.battery} />
+                <BatteryBadge core={c} beacons={beacons} />
                 <Toggle
                   checked={c.connected && c.monitoring}
                   onChange={() => c.connected && toggleCore(c.id)}
@@ -1287,6 +1329,12 @@ const fmtTs = (ts: string) =>
     minute: "2-digit",
   })
 
+const EVENT_UI = {
+  exit: { icon: "alert", title: "안전반경 이탈", body: "이 안전반경을 벗어났어요", tone: "bg-coral-light text-coral-dark" },
+  present: { icon: "check", title: "안전반경 복귀", body: "이 안전반경 안으로 돌아왔어요", tone: "bg-mint-light text-mint-dark" },
+  low_battery: { icon: "bell", title: "배터리 교체 필요", body: "의 착코어 배터리가 얼마 남지 않았어요", tone: "bg-coral-light text-coral-dark" },
+}
+
 function NotificationPanel({
   events,
   onClose,
@@ -1317,32 +1365,26 @@ function NotificationPanel({
             </p>
           )}
           {events.map((e) => {
-            const out = e.status === "exit"
+            const k = EVENT_UI[e.status]
             return (
               <div
                 key={e.id}
                 className="flex gap-3 rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100"
               >
                 <span
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
-                    out
-                      ? "bg-coral-light text-coral-dark"
-                      : "bg-mint-light text-mint-dark"
-                  }`}
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${k.tone}`}
                 >
-                  <Icon name={out ? "alert" : "check"} className="h-5 w-5" />
+                  <Icon name={k.icon} className="h-5 w-5" />
                 </span>
                 <div className="flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-bold text-navy">
-                      {out ? "안전반경 이탈" : "안전반경 복귀"}
-                    </p>
+                    <p className="text-sm font-bold text-navy">{k.title}</p>
                     <span className="shrink-0 text-[10px] text-gray-400">
                       {fmtTs(e.ts)}
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
-                    {e.subject} 님이 {out ? "안전반경을 벗어났어요" : "안전반경 안으로 돌아왔어요"}
+                    {e.subject} 님{k.body}
                     {e.receiver ? ` · ${e.receiver}` : ""}
                   </p>
                 </div>
@@ -1369,6 +1411,7 @@ export default function App() {
   const [radius, setRadius] = useState(30)
   const [points, setPoints] = useState(3500)
   const [relayOn, setRelayOn] = useState(true)
+  const beacons = useBeaconStatus()
   const [events, setEvents] = useState<EventRow[]>([])
   const [activeAlert, setActiveAlert] = useState<EventRow | null>(null)
   const [patternAlert, setPatternAlert] = useState(false)
@@ -1377,7 +1420,7 @@ export default function App() {
   const [menuPage, setMenuPage] = useState<null | string>(null)
 
   const [cores, setCores] = useState<Core[]>([
-    { id: "c1", name: "착코어 A", battery: 82, connected: true, monitoring: true },
+    { id: "c1", name: "착코어 A", battery: 82, connected: true, monitoring: true, subject: PROTECTED.name },
     { id: "c2", name: "착코어 B", battery: 34, connected: true, monitoring: false },
   ])
 
@@ -1453,6 +1496,7 @@ export default function App() {
         <main className="flex-1 overflow-y-auto px-5 py-5">
           {tab === "home" && (
             <HomeScreen
+              beacons={beacons}
               cores={cores}
               radius={radius}
               points={points}
@@ -1462,11 +1506,12 @@ export default function App() {
           )}
           {tab === "live" && (
             <LiveMapScreen
+              beacons={beacons}
               radius={radius}
               setRadius={setRadius}
               cores={cores}
               setCores={setCores}
-              latest={events[0]}
+              latest={events.find((e) => e.status !== "low_battery")}
               relayOn={relayOn}
               setRelayOn={setRelayOn}
             />

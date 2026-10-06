@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js"
 export type EventRow = {
   id: number
   subject: string
-  status: "exit" | "present"
+  status: "exit" | "present" | "low_battery"
   receiver: string | null
   rssi: number | null
   ts: string
