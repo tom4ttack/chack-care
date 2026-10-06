@@ -10,27 +10,23 @@ type Core = {
   battery: number
   connected: boolean
   monitoring: boolean
-  rssi: number
 }
 
-type Reward = {
-  id: string
-  ts: string
-  label: string
-  area: string
-  points: number
-}
+type Reward = { id: string; ts: string; label: string; area: string; points: number }
 
-type ShopItem = {
-  id: string
-  brand: string
-  name: string
-  cost: number
-}
+type ShopItem = { id: string; brand: string; name: string; cost: number }
 
 type TabKey = "home" | "live" | "report" | "reward"
 
 const PROTECTED = { name: "김서준", relation: "아들 · 만 8세" }
+
+const reward = (id: string, ts: string, area: string): Reward => ({
+  id,
+  ts,
+  area,
+  label: "실종자 찾기 제보",
+  points: 500,
+})
 
 const SHOP_ITEMS: ShopItem[] = [
   { id: "s1", brand: "카페", name: "아메리카노 Tall", cost: 4500 },
@@ -48,10 +44,8 @@ function rssiToDistance(rssi: number, txPower = -59, n = 2.4) {
 class Kalman {
   private cov = NaN
   private x = NaN
-  constructor(
-    private r = 4,
-    private q = 0.6,
-  ) {}
+  private r = 4
+  private q = 0.6
   filter(z: number) {
     if (isNaN(this.x)) {
       this.x = z
@@ -68,173 +62,35 @@ class Kalman {
 
 /* ---------- 라인 아이콘 ---------- */
 
-const ICONS: Record<string, React.ReactNode> = {
-  home: (
-    <>
-      <path d="M3 10.5 12 3l9 7.5" />
-      <path d="M5 9.5V21h14V9.5" />
-    </>
-  ),
-  signal: (
-    <>
-      <path d="M12 20h.01" />
-      <path d="M8.5 16.5a5 5 0 0 1 7 0" />
-      <path d="M5.5 13a10 10 0 0 1 13 0" />
-      <path d="M2.5 9.5a15 15 0 0 1 19 0" />
-    </>
-  ),
-  map: (
-    <>
-      <path d="M9 3 3 5.5v15.5l6-2.5 6 2.5 6-2.5V3l-6 2.5L9 3Z" />
-      <path d="M9 3v15.5" />
-      <path d="M15 5.5V21" />
-    </>
-  ),
-  wallet: (
-    <>
-      <rect x="3" y="6" width="18" height="13" rx="2.5" />
-      <path d="M3 10h18" />
-      <path d="M16 14.5h.01" />
-    </>
-  ),
-  person: (
-    <>
-      <circle cx="12" cy="8" r="3.2" />
-      <path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
-    </>
-  ),
-  phone: (
-    <>
-      <rect x="7" y="3" width="10" height="18" rx="2.5" />
-      <path d="M11 18h2" />
-    </>
-  ),
-  link: (
-    <>
-      <path d="M9.5 14.5l5-5" />
-      <path d="M11.5 7.5l1-1a3.5 3.5 0 0 1 5 5l-1 1" />
-      <path d="M12.5 16.5l-1 1a3.5 3.5 0 0 1-5-5l1-1" />
-    </>
-  ),
-  alert: (
-    <>
-      <path d="M12 3 2 20h20L12 3Z" />
-      <path d="M12 9v5" />
-      <path d="M12 17h.01" />
-    </>
-  ),
-  megaphone: (
-    <>
-      <path d="M4 10v4h4l7 4V6l-7 4H4Z" />
-      <path d="M18 9a3 3 0 0 1 0 6" />
-    </>
-  ),
-  search: (
-    <>
-      <circle cx="11" cy="11" r="6" />
-      <path d="M20 20l-4-4" />
-    </>
-  ),
-  pin: (
-    <>
-      <path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z" />
-      <circle cx="12" cy="10" r="2.5" />
-    </>
-  ),
-  broadcast: (
-    <>
-      <circle cx="12" cy="12" r="2" />
-      <path d="M8 8a5.6 5.6 0 0 0 0 8" />
-      <path d="M16 8a5.6 5.6 0 0 1 0 8" />
-      <path d="M5 5a10 10 0 0 0 0 14" />
-      <path d="M19 5a10 10 0 0 1 0 14" />
-    </>
-  ),
-  gift: (
-    <>
-      <path d="M4 11.5h16V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-8.5Z" />
-      <path d="M3 8h18v3.5H3V8Z" />
-      <path d="M12 8v13" />
-      <path d="M12 8S10.5 3.5 8 4.5 9.5 8 12 8Zm0 0s1.5-4.5 4-3.5S14.5 8 12 8Z" />
-    </>
-  ),
-  check: <path d="M5 12.5l4.5 4.5L19 7" />,
-  walk: (
-    <>
-      <circle cx="13" cy="4.5" r="1.6" />
-      <path d="M11 21l1.5-5-2.5-2.5 1-5 3 2 2 2" />
-      <path d="M11 13l-2 3-2 3" />
-    </>
-  ),
-  pause: (
-    <>
-      <path d="M9 6v12" />
-      <path d="M15 6v12" />
-    </>
-  ),
-  chart: (
-    <>
-      <path d="M3 21h18" />
-      <path d="M6.5 21v-6" />
-      <path d="M12 21V8" />
-      <path d="M17.5 21v-9" />
-    </>
-  ),
-  route: (
-    <>
-      <circle cx="6" cy="19" r="2" />
-      <circle cx="18" cy="5" r="2" />
-      <path d="M8 19h6.5a3 3 0 0 0 0-6h-5a3 3 0 0 1 0-6H16" />
-    </>
-  ),
-  home2: (
-    <>
-      <path d="M4 11 12 4l8 7" />
-      <path d="M6 10v10h12V10" />
-    </>
-  ),
-  menu: (
-    <>
-      <path d="M4 7h16" />
-      <path d="M4 12h16" />
-      <path d="M4 17h16" />
-    </>
-  ),
-  bell: (
-    <>
-      <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" />
-      <path d="M10 19a2 2 0 0 0 4 0" />
-    </>
-  ),
-  settings: (
-    <>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" />
-    </>
-  ),
-  store: (
-    <>
-      <path d="M4 9h16l-1-4H5L4 9Z" />
-      <path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9" />
-      <path d="M10 20v-5h4v5" />
-    </>
-  ),
-  chevron: <path d="M9 6l6 6-6 6" />,
-  close: (
-    <>
-      <path d="M6 6l12 12" />
-      <path d="M18 6 6 18" />
-    </>
-  ),
+const ICONS: Record<string, string> = {
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
+  signal: '<path d="M12 20h.01"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5.5 13a10 10 0 0 1 13 0"/><path d="M2.5 9.5a15 15 0 0 1 19 0"/>',
+  map: '<path d="M9 3 3 5.5v15.5l6-2.5 6 2.5 6-2.5V3l-6 2.5L9 3Z"/><path d="M9 3v15.5"/><path d="M15 5.5V21"/>',
+  wallet: '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><path d="M16 14.5h.01"/>',
+  person: '<circle cx="12" cy="8" r="3.2"/><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/>',
+  phone: '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 18h2"/>',
+  link: '<path d="M9.5 14.5l5-5"/><path d="M11.5 7.5l1-1a3.5 3.5 0 0 1 5 5l-1 1"/><path d="M12.5 16.5l-1 1a3.5 3.5 0 0 1-5-5l1-1"/>',
+  alert: '<path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5"/><path d="M12 17h.01"/>',
+  megaphone: '<path d="M4 10v4h4l7 4V6l-7 4H4Z"/><path d="M18 9a3 3 0 0 1 0 6"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/>',
+  pin: '<path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/>',
+  broadcast: '<circle cx="12" cy="12" r="2"/><path d="M8 8a5.6 5.6 0 0 0 0 8"/><path d="M16 8a5.6 5.6 0 0 1 0 8"/><path d="M5 5a10 10 0 0 0 0 14"/><path d="M19 5a10 10 0 0 1 0 14"/>',
+  gift: '<path d="M4 11.5h16V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-8.5Z"/><path d="M3 8h18v3.5H3V8Z"/><path d="M12 8v13"/><path d="M12 8S10.5 3.5 8 4.5 9.5 8 12 8Zm0 0s1.5-4.5 4-3.5S14.5 8 12 8Z"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
+  walk: '<circle cx="13" cy="4.5" r="1.6"/><path d="M11 21l1.5-5-2.5-2.5 1-5 3 2 2 2"/><path d="M11 13l-2 3-2 3"/>',
+  pause: '<path d="M9 6v12"/><path d="M15 6v12"/>',
+  chart: '<path d="M3 21h18"/><path d="M6.5 21v-6"/><path d="M12 21V8"/><path d="M17.5 21v-9"/>',
+  route: '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h6.5a3 3 0 0 0 0-6h-5a3 3 0 0 1 0-6H16"/>',
+  home2: '<path d="M4 11 12 4l8 7"/><path d="M6 10v10h12V10"/>',
+  menu: '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>',
+  bell: '<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z"/><path d="M10 19a2 2 0 0 0 4 0"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/>',
+  store: '<path d="M4 9h16l-1-4H5L4 9Z"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M10 20v-5h4v5"/>',
+  chevron: '<path d="M9 6l6 6-6 6"/>',
+  close: '<path d="M6 6l12 12"/><path d="M18 6 6 18"/>',
 }
 
-function Icon({
-  name,
-  className = "h-5 w-5",
-}: {
-  name: string
-  className?: string
-}) {
+function Icon({ name, className = "h-5 w-5" }: { name: string; className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -244,9 +100,8 @@ function Icon({
       strokeWidth={1.8}
       strokeLinecap="round"
       strokeLinejoin="round"
-    >
-      {ICONS[name]}
-    </svg>
+      dangerouslySetInnerHTML={{ __html: ICONS[name] }}
+    />
   )
 }
 
@@ -271,12 +126,7 @@ function BatteryBar({ level }: { level: number }) {
   )
 }
 
-type SectionTitleProps = {
-  title: string
-  sub?: string
-}
-
-function SectionTitle({ title, sub }: SectionTitleProps) {
+function SectionTitle({ title, sub }: { title: string; sub?: string }) {
   return (
     <div className="mb-3 flex items-end justify-between">
       <h2 className="text-[15px] font-extrabold tracking-tight text-navy">
@@ -313,7 +163,92 @@ function Toggle({
   )
 }
 
+function MapSvg({
+  stroke,
+  width,
+  children,
+}: {
+  stroke: string
+  width: number
+  children: React.ReactNode
+}) {
+  return (
+    <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full">
+      <rect width="400" height="400" fill="#EEF7F6" />
+      {[70, 150, 230, 310].map((y) => (
+        <line key={`h${y}`} x1="0" y1={y} x2="400" y2={y} stroke={stroke} strokeWidth={width} />
+      ))}
+      {[60, 150, 250, 340].map((x) => (
+        <line key={`v${x}`} x1={x} y1="0" x2={x} y2="400" stroke={stroke} strokeWidth={width} />
+      ))}
+      {children}
+    </svg>
+  )
+}
+
 /* ---------- 모달 ---------- */
+
+function AlertSheet({
+  icon,
+  title,
+  sub,
+  vibrate,
+  confirm,
+  onClose,
+  onConfirm,
+  children,
+}: {
+  icon: string
+  title: string
+  sub: string
+  vibrate: number[]
+  confirm: string
+  onClose: () => void
+  onConfirm: () => void
+  children: React.ReactNode
+}) {
+  useEffect(() => {
+    try {
+      navigator.vibrate?.(vibrate)
+    } catch {}
+  }, [])
+
+  return (
+    <div className="absolute inset-0 z-50 flex items-end justify-center bg-navy/60 backdrop-blur-sm">
+      <div className="animate-slide-up w-full overflow-hidden rounded-t-3xl bg-white">
+        <div className="animate-siren px-6 py-5 text-white">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20">
+              <Icon name={icon} className="h-6 w-6" />
+            </span>
+            <div>
+              <p className="text-lg font-extrabold leading-tight">{title}</p>
+              <p className="text-sm opacity-90">{sub}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 px-6 pb-8 pt-5">
+          {children}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-2xl bg-gray-100 py-3.5 text-sm font-bold text-gray-700 transition active:scale-[.98]"
+            >
+              해제
+            </button>
+            <button
+              onClick={onConfirm}
+              className="flex-1 rounded-2xl bg-coral py-3.5 text-sm font-bold text-white shadow-lg shadow-coral/30 transition active:scale-[.98]"
+            >
+              {confirm}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function AlertModal({
   core,
@@ -331,135 +266,46 @@ function AlertModal({
   const [seconds, setSeconds] = useState(0)
   useEffect(() => {
     const t = setInterval(() => setSeconds((s) => s + 1), 1000)
-    try {
-      navigator.vibrate?.([400, 200, 400, 200, 600])
-    } catch {}
     return () => clearInterval(t)
   }, [])
 
   return (
-    <div className="absolute inset-0 z-50 flex items-end justify-center bg-navy/60 backdrop-blur-sm">
-      <div className="animate-slide-up w-full overflow-hidden rounded-t-3xl bg-white">
-        <div className="animate-siren px-6 py-5 text-white">
-          <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20">
-              <Icon name="alert" className="h-6 w-6" />
-            </span>
-            <div>
-              <p className="text-lg font-extrabold leading-tight">
-                안전반경 이탈 감지
-              </p>
-              <p className="text-sm opacity-90">
-                {PROTECTED.name} · {core.name}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4 px-6 pb-8 pt-5">
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-2xl bg-coral-light py-3">
-              <p className="text-[11px] font-semibold text-coral-dark">
-                추정 거리
-              </p>
-              <p className="text-xl font-extrabold text-coral-dark">
-                {distance.toFixed(0)}m
-              </p>
-            </div>
-            <div className="rounded-2xl bg-gray-100 py-3">
-              <p className="text-[11px] font-semibold text-gray-500">
-                안전반경
-              </p>
-              <p className="text-xl font-extrabold text-navy">{radius}m</p>
-            </div>
-            <div className="rounded-2xl bg-gray-100 py-3">
-              <p className="text-[11px] font-semibold text-gray-500">경과</p>
-              <p className="text-xl font-extrabold text-navy tabular-nums">
-                {seconds}s
-              </p>
-            </div>
-          </div>
-
-          <p className="rounded-2xl bg-mint-light px-4 py-3 text-[13px] leading-relaxed text-mint-dark">
-            안전반경을 벗어났습니다. 주변을 즉시 확인해 주세요.
-          </p>
-
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 rounded-2xl bg-gray-100 py-3.5 text-sm font-bold text-gray-700 transition active:scale-[.98]"
+    <AlertSheet
+      icon="alert"
+      title="안전반경 이탈 감지"
+      sub={`${PROTECTED.name} · ${core.name}`}
+      vibrate={[400, 200, 400, 200, 600]}
+      confirm="확인"
+      onClose={onClose}
+      onConfirm={onViewLocation}
+    >
+      <div className="grid grid-cols-3 gap-3 text-center">
+        {[
+          { k: "추정 거리", v: `${distance.toFixed(0)}m`, hot: true },
+          { k: "안전반경", v: `${radius}m`, hot: false },
+          { k: "경과", v: `${seconds}s`, hot: false },
+        ].map((s) => (
+          <div
+            key={s.k}
+            className={`rounded-2xl py-3 ${s.hot ? "bg-coral-light" : "bg-gray-100"}`}
+          >
+            <p
+              className={`text-[11px] font-semibold ${s.hot ? "text-coral-dark" : "text-gray-500"}`}
             >
-              해제
-            </button>
-            <button
-              onClick={onViewLocation}
-              className="flex-1 rounded-2xl bg-coral py-3.5 text-sm font-bold text-white shadow-lg shadow-coral/30 transition active:scale-[.98]"
+              {s.k}
+            </p>
+            <p
+              className={`text-xl font-extrabold tabular-nums ${s.hot ? "text-coral-dark" : "text-navy"}`}
             >
-              확인
-            </button>
+              {s.v}
+            </p>
           </div>
-        </div>
+        ))}
       </div>
-    </div>
-  )
-}
-
-function PatternAlertModal({
-  onClose,
-  onViewLocation,
-}: {
-  onClose: () => void
-  onViewLocation: () => void
-}) {
-  useEffect(() => {
-    try {
-      navigator.vibrate?.([300, 150, 300])
-    } catch {}
-  }, [])
-
-  return (
-    <div className="absolute inset-0 z-50 flex items-end justify-center bg-navy/60 backdrop-blur-sm">
-      <div className="animate-slide-up w-full overflow-hidden rounded-t-3xl bg-white">
-        <div className="animate-siren px-6 py-5 text-white">
-          <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20">
-              <Icon name="route" className="h-6 w-6" />
-            </span>
-            <div>
-              <p className="text-lg font-extrabold leading-tight">
-                평소 경로 이탈 감지
-              </p>
-              <p className="text-sm opacity-90">{PROTECTED.name}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4 px-6 pb-8 pt-5">
-          <p className="text-center text-xl font-extrabold text-navy">
-            평소 이동 경로를
-            <br />
-            <span className="text-coral-dark">80% 이상</span> 벗어났습니다
-          </p>
-          <p className="rounded-2xl bg-coral-light px-4 py-3 text-center text-[13px] leading-relaxed text-coral-dark">
-            평소 가지 않던 방향으로 이동하고 있어요. 위치를 확인해 주세요.
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 rounded-2xl bg-gray-100 py-3.5 text-sm font-bold text-gray-700 transition active:scale-[.98]"
-            >
-              해제
-            </button>
-            <button
-              onClick={onViewLocation}
-              className="flex-1 rounded-2xl bg-coral py-3.5 text-sm font-bold text-white shadow-lg shadow-coral/30 transition active:scale-[.98]"
-            >
-              위치 확인
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+      <p className="rounded-2xl bg-mint-light px-4 py-3 text-[13px] leading-relaxed text-mint-dark">
+        안전반경을 벗어났습니다. 주변을 즉시 확인해 주세요.
+      </p>
+    </AlertSheet>
   )
 }
 
@@ -493,7 +339,7 @@ function HomeScreen({
           </div>
           <div>
             <p className="text-sm font-medium opacity-90">
-              김철수 · 부 · 만 74세
+              김서준 · 아들 · 만 8세
             </p>
             <p className="text-2xl font-extrabold tracking-tight">
               안심 · 반경 내
@@ -687,30 +533,7 @@ function LiveMapScreen({
       )}
 
       <div className="relative aspect-square overflow-hidden rounded-3xl ring-1 ring-gray-200">
-        <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full">
-          <rect width="400" height="400" fill="#EEF7F6" />
-          {[70, 150, 230, 310].map((y) => (
-            <line
-              key={`h${y}`}
-              x1="0"
-              y1={y}
-              x2="400"
-              y2={y}
-              stroke="#D9ECEA"
-              strokeWidth="9"
-            />
-          ))}
-          {[60, 150, 250, 340].map((x) => (
-            <line
-              key={`v${x}`}
-              x1={x}
-              y1="0"
-              x2={x}
-              y2="400"
-              stroke="#D9ECEA"
-              strokeWidth="9"
-            />
-          ))}
+        <MapSvg stroke="#D9ECEA" width={9}>
           <circle
             cx="200"
             cy="210"
@@ -720,7 +543,7 @@ function LiveMapScreen({
             strokeWidth="2"
             strokeDasharray="7 6"
           />
-        </svg>
+        </MapSvg>
 
         <div
           className="absolute flex h-11 w-11 items-center justify-center rounded-full bg-white text-navy shadow-md"
@@ -928,12 +751,14 @@ const PLACES = [
   { name: "놀이터", desc: "주 2회 · 14-15시", freq: 34, icon: "pin" },
 ]
 
-const ACTIVITY_CLUSTERS: {
-  x: number
-  y: number
-  r: number
-  tier: "core" | "peripheral" | "rare"
-}[] = [
+const TIER = {
+  core: { fill: ["#2A9D8F33", "#2A9D8F55"], dot: "h-2 w-2 bg-mint/70", pin: "bg-mint" },
+  peripheral: { fill: ["#F2BE5522", "#F2BE5540"], dot: "h-1.5 w-1.5 bg-[#F2BE55]/80", pin: "bg-[#F2BE55]" },
+  rare: { fill: ["#F0706026", "#F0706048"], dot: "h-1.5 w-1.5 bg-coral/75", pin: "bg-coral" },
+}
+type Tier = keyof typeof TIER
+
+const ACTIVITY_CLUSTERS: { x: number; y: number; r: number; tier: Tier }[] = [
   { x: 200, y: 205, r: 42, tier: "core" },
   { x: 300, y: 150, r: 30, tier: "core" },
   { x: 120, y: 120, r: 26, tier: "peripheral" },
@@ -942,44 +767,11 @@ const ACTIVITY_CLUSTERS: {
   { x: 52, y: 326, r: 16, tier: "rare" },
 ]
 
-const ACTIVITY_DOTS: {
-  x: number
-  y: number
-  tier: "core" | "peripheral" | "rare"
-}[] = [
-  { x: 48, y: 50, tier: "core" },
-  { x: 52, y: 46, tier: "core" },
-  { x: 45, y: 54, tier: "core" },
-  { x: 55, y: 52, tier: "core" },
-  { x: 50, y: 48, tier: "core" },
-  { x: 53, y: 55, tier: "core" },
-  { x: 72, y: 36, tier: "core" },
-  { x: 76, y: 40, tier: "core" },
-  { x: 68, y: 39, tier: "core" },
-  { x: 74, y: 33, tier: "core" },
-  { x: 70, y: 38, tier: "core" },
-  { x: 73, y: 42, tier: "core" },
-  { x: 28, y: 28, tier: "peripheral" },
-  { x: 32, y: 32, tier: "peripheral" },
-  { x: 26, y: 33, tier: "peripheral" },
-  { x: 30, y: 26, tier: "peripheral" },
-  { x: 36, y: 74, tier: "peripheral" },
-  { x: 40, y: 78, tier: "peripheral" },
-  { x: 33, y: 72, tier: "peripheral" },
-  { x: 38, y: 76, tier: "peripheral" },
-  { x: 60, y: 40, tier: "peripheral" },
-  { x: 42, y: 62, tier: "peripheral" },
-  { x: 58, y: 62, tier: "peripheral" },
-  { x: 50, y: 66, tier: "peripheral" },
-  { x: 88, y: 79, tier: "rare" },
-  { x: 91, y: 82, tier: "rare" },
-  { x: 86, y: 76, tier: "rare" },
-  { x: 89, y: 84, tier: "rare" },
-  { x: 12, y: 80, tier: "rare" },
-  { x: 15, y: 83, tier: "rare" },
-  { x: 10, y: 77, tier: "rare" },
-  { x: 13, y: 85, tier: "rare" },
-]
+const ACTIVITY_DOTS: Record<Tier, number[][]> = {
+  core: [[48, 50], [52, 46], [45, 54], [55, 52], [50, 48], [53, 55], [72, 36], [76, 40], [68, 39], [74, 33], [70, 38], [73, 42]],
+  peripheral: [[28, 28], [32, 32], [26, 33], [30, 26], [36, 74], [40, 78], [33, 72], [38, 76], [60, 40], [42, 62], [58, 62], [50, 66]],
+  rare: [[88, 79], [91, 82], [86, 76], [89, 84], [12, 80], [15, 83], [10, 77], [13, 85]],
+}
 
 const DAY_PATTERN = {
   weekday: [
@@ -1026,33 +818,7 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
         <SectionTitle title="행동반경 지도" sub="최근 14일 방문 기록" />
         <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
           <div className="relative aspect-square">
-            <svg
-              viewBox="0 0 400 400"
-              className="absolute inset-0 h-full w-full"
-            >
-              <rect width="400" height="400" fill="#EEF7F6" />
-              {[70, 150, 230, 310].map((y) => (
-                <line
-                  key={`h${y}`}
-                  x1="0"
-                  y1={y}
-                  x2="400"
-                  y2={y}
-                  stroke="#DCEEEC"
-                  strokeWidth="8"
-                />
-              ))}
-              {[60, 150, 250, 340].map((x) => (
-                <line
-                  key={`v${x}`}
-                  x1={x}
-                  y1="0"
-                  x2={x}
-                  y2="400"
-                  stroke="#DCEEEC"
-                  strokeWidth="8"
-                />
-              ))}
+            <MapSvg stroke="#DCEEEC" width={8}>
               <circle
                 cx="200"
                 cy="205"
@@ -1062,64 +828,37 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
                 strokeWidth="2"
                 strokeDasharray="7 6"
               />
+              {ACTIVITY_CLUSTERS.map((c, i) => (
+                <g key={i}>
+                  <circle cx={c.x} cy={c.y} r={c.r} fill={TIER[c.tier].fill[0]} />
+                  <circle cx={c.x} cy={c.y} r={c.r * 0.55} fill={TIER[c.tier].fill[1]} />
+                </g>
+              ))}
+            </MapSvg>
 
-              {ACTIVITY_CLUSTERS.map((c, i) => {
-                const [outer, inner] =
-                  c.tier === "core"
-                    ? ["#2A9D8F33", "#2A9D8F55"]
-                    : c.tier === "peripheral"
-                      ? ["#F2BE5522", "#F2BE5540"]
-                      : ["#F0706026", "#F0706048"]
-                return (
-                  <g key={i}>
-                    <circle cx={c.x} cy={c.y} r={c.r} fill={outer} />
-                    <circle cx={c.x} cy={c.y} r={c.r * 0.55} fill={inner} />
-                  </g>
-                )
-              })}
-            </svg>
+            {(Object.keys(ACTIVITY_DOTS) as Tier[]).flatMap((tier) =>
+              ACTIVITY_DOTS[tier].map(([x, y], i) => (
+                <span
+                  key={`${tier}${i}`}
+                  className={`absolute rounded-full ${TIER[tier].dot}`}
+                  style={{ left: `${x}%`, top: `${y}%` }}
+                />
+              )),
+            )}
 
-            {ACTIVITY_DOTS.map((d, i) => (
-              <span
+            {ACTIVITY_CLUSTERS.map((c, i) => (
+              <div
                 key={i}
-                className={`absolute rounded-full ${
-                  d.tier === "core"
-                    ? "h-2 w-2 bg-mint/70"
-                    : d.tier === "peripheral"
-                      ? "h-1.5 w-1.5 bg-[#F2BE55]/80"
-                      : "h-1.5 w-1.5 bg-coral/75"
-                }`}
-                style={{ left: `${d.x}%`, top: `${d.y}%` }}
-              />
-            ))}
-
-            {ACTIVITY_CLUSTERS.map((c, i) => {
-              const bg =
-                c.tier === "core"
-                  ? "bg-mint"
-                  : c.tier === "peripheral"
-                    ? "bg-[#F2BE55]"
-                    : "bg-coral"
-              return (
-                <div
-                  key={i}
-                  className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
-                  style={{
-                    left: `${(c.x / 400) * 100}%`,
-                    top: `${(c.y / 400) * 100}%`,
-                  }}
+                className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+                style={{ left: `${(c.x / 400) * 100}%`, top: `${(c.y / 400) * 100}%` }}
+              >
+                <span
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-white shadow-md ${TIER[c.tier].pin}`}
                 >
-                  <span
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-white shadow-md ${bg}`}
-                  >
-                    <Icon
-                      name={c.tier === "core" ? "home2" : "pin"}
-                      className="h-4 w-4"
-                    />
-                  </span>
-                </div>
-              )
-            })}
+                  <Icon name={c.tier === "core" ? "home2" : "pin"} className="h-4 w-4" />
+                </span>
+              </div>
+            ))}
 
             <div className="absolute left-3 top-3 rounded-2xl bg-white/85 px-3 py-2 backdrop-blur">
               <p className="text-[11px] font-semibold text-gray-500">
@@ -1132,16 +871,15 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
           </div>
 
           <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-[11px]">
-            <span className="flex items-center gap-1.5 text-gray-500">
-              <span className="h-2.5 w-2.5 rounded-full bg-mint" /> 생활 거점
-            </span>
-            <span className="flex items-center gap-1.5 text-gray-500">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#F2BE55]" /> 반경
-              근처
-            </span>
-            <span className="flex items-center gap-1.5 text-gray-500">
-              <span className="h-2.5 w-2.5 rounded-full bg-coral" /> 반경 밖
-            </span>
+            {[
+              ["bg-mint", "생활 거점"],
+              ["bg-[#F2BE55]", "반경 근처"],
+              ["bg-coral", "반경 밖"],
+            ].map(([c, t]) => (
+              <span key={t} className="flex items-center gap-1.5 text-gray-500">
+                <span className={`h-2.5 w-2.5 rounded-full ${c}`} /> {t}
+              </span>
+            ))}
           </div>
         </div>
         <p className="mt-2 px-1 text-[11px] leading-relaxed text-gray-400">
@@ -1224,11 +962,9 @@ function ReportScreen({ onPreviewAlert }: { onPreviewAlert: () => void }) {
             </div>
           </div>
           <div className="mt-1.5 flex justify-between text-[10px] text-gray-400">
-            <span>0시</span>
-            <span>6시</span>
-            <span>12시</span>
-            <span>18시</span>
-            <span>24시</span>
+            {[0, 6, 12, 18, 24].map((h) => (
+              <span key={h}>{h}시</span>
+            ))}
           </div>
 
           <div className="mt-3 flex items-center gap-2 rounded-xl bg-mint-light px-3 py-2.5 text-mint-dark">
@@ -1435,30 +1171,10 @@ function RewardScreen({
 /* ---------- 사이드 패널 & 서브페이지 ---------- */
 
 const MENU_ITEMS = [
-  {
-    key: "프로필",
-    label: "프로필",
-    sub: "보호 대상 · 착코어 정보",
-    icon: "person",
-  },
-  {
-    key: "마이페이지",
-    label: "마이페이지",
-    sub: "구독 · 리워드 · 주문 내역",
-    icon: "home2",
-  },
-  {
-    key: "간단한 설정",
-    label: "간단한 설정",
-    sub: "알림 · 안전반경 · 개인정보",
-    icon: "settings",
-  },
-  {
-    key: "자사몰",
-    label: "자사몰",
-    sub: "착코어 · 액세서리 구매",
-    icon: "store",
-  },
+  ["프로필", "보호 대상 · 착코어 정보", "person"],
+  ["마이페이지", "구독 · 리워드 · 주문 내역", "home2"],
+  ["간단한 설정", "알림 · 안전반경 · 개인정보", "settings"],
+  ["자사몰", "착코어 · 액세서리 구매", "store"],
 ]
 
 function Drawer({
@@ -1483,20 +1199,18 @@ function Drawer({
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto p-3">
-          {MENU_ITEMS.map((m) => (
+          {MENU_ITEMS.map(([label, sub, icon]) => (
             <button
-              key={m.key}
-              onClick={() => onOpenPage(m.key)}
+              key={label}
+              onClick={() => onOpenPage(label)}
               className="flex w-full items-center gap-3.5 rounded-2xl px-3 py-3.5 text-left transition active:bg-gray-100"
             >
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-mint-light text-mint-dark">
-                <Icon name={m.icon} className="h-5 w-5" />
+                <Icon name={icon} className="h-5 w-5" />
               </span>
               <span className="flex-1">
-                <span className="block text-sm font-bold text-navy">
-                  {m.label}
-                </span>
-                <span className="block text-xs text-gray-500">{m.sub}</span>
+                <span className="block text-sm font-bold text-navy">{label}</span>
+                <span className="block text-xs text-gray-500">{sub}</span>
               </span>
               <Icon name="chevron" className="h-4 w-4 text-gray-300" />
             </button>
@@ -1508,12 +1222,19 @@ function Drawer({
   )
 }
 
-type MenuPageProps = {
-  page: string
-  onClose: () => void
+function KvRows({ rows }: { rows: string[][] }) {
+  return rows.map(([k, v]) => (
+    <div
+      key={k}
+      className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm ring-1 ring-gray-100"
+    >
+      <span className="text-sm text-gray-500">{k}</span>
+      <span className="text-sm font-bold text-navy">{v}</span>
+    </div>
+  ))
 }
 
-function MenuPage({ page, onClose }: MenuPageProps) {
+function MenuPage({ page, onClose }: { page: string; onClose: () => void }) {
   return (
     <div className="animate-fade-in absolute inset-0 z-50 flex flex-col bg-gray-50">
       <header className="flex items-center gap-3 border-b border-gray-100 bg-white/90 px-4 py-3.5 backdrop-blur">
@@ -1538,20 +1259,14 @@ function MenuPage({ page, onClose }: MenuPageProps) {
                 </p>
               </div>
             </div>
-            {[
-              ["보호자", "김보호 (엄마)"],
-              ["비상 연락처", "010-1234-5678"],
-              ["기본 안전반경", "30m"],
-              ["특이사항", "노란 자켓 착용"],
-            ].map(([k, v]) => (
-              <div
-                key={k}
-                className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm ring-1 ring-gray-100"
-              >
-                <span className="text-sm text-gray-500">{k}</span>
-                <span className="text-sm font-bold text-navy">{v}</span>
-              </div>
-            ))}
+            <KvRows
+              rows={[
+                ["보호자", "김보호 (엄마)"],
+                ["비상 연락처", "010-1234-5678"],
+                ["기본 안전반경", "30m"],
+                ["특이사항", "노란 자켓 착용"],
+              ]}
+            />
           </div>
         )}
         {page === "마이페이지" && (
@@ -1560,20 +1275,14 @@ function MenuPage({ page, onClose }: MenuPageProps) {
               <p className="text-xs opacity-80">보유 포인트</p>
               <p className="text-3xl font-extrabold tabular-nums">3,500P</p>
             </div>
-            {[
-              ["구독 상태", "프리미엄 케어"],
-              ["다음 결제일", "2026.09.15"],
-              ["누적 안심 제보", "27회"],
-              ["최근 주문", "착코어 B · 배송완료"],
-            ].map(([k, v]) => (
-              <div
-                key={k}
-                className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm ring-1 ring-gray-100"
-              >
-                <span className="text-sm text-gray-500">{k}</span>
-                <span className="text-sm font-bold text-navy">{v}</span>
-              </div>
-            ))}
+            <KvRows
+              rows={[
+                ["구독 상태", "프리미엄 케어"],
+                ["다음 결제일", "2026.09.15"],
+                ["누적 안심 제보", "27회"],
+                ["최근 주문", "착코어 B · 배송완료"],
+              ]}
+            />
           </div>
         )}
         {page === "간단한 설정" && (
@@ -1630,34 +1339,10 @@ function MenuPage({ page, onClose }: MenuPageProps) {
 }
 
 const NOTIFS = [
-  {
-    icon: "route",
-    tone: "coral",
-    title: "평소 경로 이탈 감지",
-    body: "평소 이동 경로를 80% 이상 벗어났습니다.",
-    ts: "5분 전",
-  },
-  {
-    icon: "gift",
-    tone: "mint",
-    title: "안심 리워드 적립",
-    body: "실종자 찾기 제보로 +500P가 적립됐어요.",
-    ts: "오늘 14:20",
-  },
-  {
-    icon: "megaphone",
-    tone: "coral",
-    title: "실종경보 수신",
-    body: "성동구 실종아동 발생 · 주변 안심 스캔이 켜졌어요.",
-    ts: "오늘 13:02",
-  },
-  {
-    icon: "alert",
-    tone: "mint",
-    title: "안전반경 복귀",
-    body: "김철수 님이 안전반경 안으로 돌아왔어요.",
-    ts: "어제 18:40",
-  },
+  { icon: "route", tone: "coral", title: "평소 경로 이탈 감지", body: "평소 이동 경로를 80% 이상 벗어났습니다.", ts: "5분 전" },
+  { icon: "gift", tone: "mint", title: "안심 리워드 적립", body: "실종자 찾기 제보로 +500P가 적립됐어요.", ts: "오늘 14:20" },
+  { icon: "megaphone", tone: "coral", title: "실종경보 수신", body: "성동구 실종아동 발생 · 주변 안심 스캔이 켜졌어요.", ts: "오늘 13:02" },
+  { icon: "alert", tone: "mint", title: "안전반경 복귀", body: `${PROTECTED.name} 님이 안전반경 안으로 돌아왔어요.`, ts: "어제 18:40" },
 ]
 
 function NotificationPanel({ onClose }: { onClose: () => void }) {
@@ -1735,68 +1420,25 @@ export default function App() {
   const [menuPage, setMenuPage] = useState<null | string>(null)
 
   const [cores, setCores] = useState<Core[]>([
-    {
-      id: "c1",
-      name: "착코어 A",
-      battery: 82,
-      connected: true,
-      monitoring: true,
-      rssi: -58,
-    },
-    {
-      id: "c2",
-      name: "착코어 B",
-      battery: 34,
-      connected: true,
-      monitoring: false,
-      rssi: -71,
-    },
+    { id: "c1", name: "착코어 A", battery: 82, connected: true, monitoring: true },
+    { id: "c2", name: "착코어 B", battery: 34, connected: true, monitoring: false },
   ])
 
   const [rewards, setRewards] = useState<Reward[]>([
-    {
-      id: "r1",
-      ts: "오늘 14:20",
-      label: "실종자 찾기 제보",
-      area: "성수동 2가",
-      points: 500,
-    },
-    {
-      id: "r2",
-      ts: "어제 19:05",
-      label: "실종자 찾기 제보",
-      area: "왕십리역 인근",
-      points: 500,
-    },
-    {
-      id: "r3",
-      ts: "8/23 11:40",
-      label: "실종자 찾기 제보",
-      area: "서울숲 공원",
-      points: 500,
-    },
+    reward("r1", "오늘 14:20", "성수동 2가"),
+    reward("r2", "어제 19:05", "왕십리역 인근"),
+    reward("r3", "8/23 11:40", "서울숲 공원"),
   ])
-
-  function triggerAlert(core: Core, distance: number) {
-    setActiveAlert({ core, distance })
-  }
 
   function handleScan() {
     setPoints((p) => p + 500)
-    setRewards((prev) => [
-      {
-        id: `r${Date.now()}`,
-        ts: "방금",
-        label: "실종자 찾기 제보",
-        area: "현재 위치 인근",
-        points: 500,
-      },
-      ...prev,
-    ])
+    setRewards((prev) => [reward(`r${Date.now()}`, "방금", "현재 위치 인근"), ...prev])
   }
 
-  function handleRedeem(item: ShopItem) {
-    setPoints((p) => Math.max(0, p - item.cost))
+  const goLive = () => {
+    setActiveAlert(null)
+    setPatternAlert(false)
+    setTab("live")
   }
 
   return (
@@ -1839,7 +1481,7 @@ export default function App() {
               setRadius={setRadius}
               cores={cores}
               setCores={setCores}
-              onTriggerAlert={triggerAlert}
+              onTriggerAlert={(core, distance) => setActiveAlert({ core, distance })}
               relayOn={relayOn}
               setRelayOn={setRelayOn}
             />
@@ -1854,7 +1496,7 @@ export default function App() {
               relayOn={relayOn}
               setRelayOn={setRelayOn}
               onScan={handleScan}
-              onRedeem={handleRedeem}
+              onRedeem={(item) => setPoints((p) => Math.max(0, p - item.cost))}
             />
           )}
         </main>
@@ -1896,21 +1538,29 @@ export default function App() {
             distance={activeAlert.distance}
             radius={radius}
             onClose={() => setActiveAlert(null)}
-            onViewLocation={() => {
-              setActiveAlert(null)
-              setTab("live")
-            }}
+            onViewLocation={goLive}
           />
         )}
 
         {patternAlert && (
-          <PatternAlertModal
+          <AlertSheet
+            icon="route"
+            title="평소 경로 이탈 감지"
+            sub={PROTECTED.name}
+            vibrate={[300, 150, 300]}
+            confirm="위치 확인"
             onClose={() => setPatternAlert(false)}
-            onViewLocation={() => {
-              setPatternAlert(false)
-              setTab("live")
-            }}
-          />
+            onConfirm={goLive}
+          >
+            <p className="text-center text-xl font-extrabold text-navy">
+              평소 이동 경로를
+              <br />
+              <span className="text-coral-dark">80% 이상</span> 벗어났습니다
+            </p>
+            <p className="rounded-2xl bg-coral-light px-4 py-3 text-center text-[13px] leading-relaxed text-coral-dark">
+              평소 가지 않던 방향으로 이동하고 있어요. 위치를 확인해 주세요.
+            </p>
+          </AlertSheet>
         )}
 
         {drawerOpen && (
