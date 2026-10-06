@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
+import { supabase, type EventRow } from "./lib/supabase"
 
 /* ============================================================
    착케어 (ChakCare) — 실종·분실 방지 스마트 앱
@@ -34,31 +35,6 @@ const SHOP_ITEMS: ShopItem[] = [
   { id: "s3", brand: "베이커리", name: "조각케이크 교환권", cost: 6500 },
   { id: "s4", brand: "치킨", name: "후라이드 한 마리", cost: 20000 },
 ]
-
-/* ---------- 신호 유틸: RSSI → 거리, 칼만 필터 ---------- */
-
-function rssiToDistance(rssi: number, txPower = -59, n = 2.4) {
-  return Math.pow(10, (txPower - rssi) / (10 * n))
-}
-
-class Kalman {
-  private cov = NaN
-  private x = NaN
-  private r = 4
-  private q = 0.6
-  filter(z: number) {
-    if (isNaN(this.x)) {
-      this.x = z
-      this.cov = this.r
-    } else {
-      const pCov = this.cov + this.q
-      const k = pCov / (pCov + this.r)
-      this.x += k * (z - this.x)
-      this.cov = (1 - k) * pCov
-    }
-    return this.x
-  }
-}
 
 /* ---------- 라인 아이콘 ---------- */
 
@@ -251,14 +227,12 @@ function AlertSheet({
 }
 
 function AlertModal({
-  core,
-  distance,
+  event,
   radius,
   onClose,
   onViewLocation,
 }: {
-  core: Core
-  distance: number
+  event: EventRow
   radius: number
   onClose: () => void
   onViewLocation: () => void
@@ -273,7 +247,7 @@ function AlertModal({
     <AlertSheet
       icon="alert"
       title="안전반경 이탈 감지"
-      sub={`${PROTECTED.name} · ${core.name}`}
+      sub={`${event.subject} · ${event.receiver ?? "수신기"}`}
       vibrate={[400, 200, 400, 200, 600]}
       confirm="확인"
       onClose={onClose}
@@ -281,7 +255,7 @@ function AlertModal({
     >
       <div className="grid grid-cols-3 gap-3 text-center">
         {[
-          { k: "추정 거리", v: `${distance.toFixed(0)}m`, hot: true },
+          { k: "마지막 신호", v: event.rssi != null ? `${event.rssi}dBm` : "–", hot: true },
           { k: "안전반경", v: `${radius}m`, hot: false },
           { k: "경과", v: `${seconds}s`, hot: false },
         ].map((s) => (
@@ -433,7 +407,7 @@ function LiveMapScreen({
   setRadius,
   cores,
   setCores,
-  onTriggerAlert,
+  latest,
   relayOn,
   setRelayOn,
 }: {
@@ -441,7 +415,7 @@ function LiveMapScreen({
   setRadius: (r: number) => void
   cores: Core[]
   setCores: React.Dispatch<React.SetStateAction<Core[]>>
-  onTriggerAlert: (core: Core, distance: number) => void
+  latest?: EventRow
   relayOn: boolean
   setRelayOn: (v: boolean) => void
 }) {
@@ -449,38 +423,10 @@ function LiveMapScreen({
   const monitoringOn = monitored.length > 0
   const active = monitored[0] ?? cores.find((c) => c.connected) ?? cores[0]
 
-  const [lastFiltered, setLastFiltered] = useState(-60)
-  const [walking, setWalking] = useState(false)
-  const kalman = useRef(new Kalman())
-  const baseRef = useRef(-60)
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (walking) {
-        baseRef.current = Math.max(-95, baseRef.current - 1.8)
-      } else {
-        baseRef.current += (-60 - baseRef.current) * 0.3
-      }
-      const jitter = walking ? 9 : 2
-      const noisy = baseRef.current + (Math.random() - 0.5) * jitter
-      setLastFiltered(kalman.current.filter(noisy))
-    }, 250)
-    return () => clearInterval(id)
-  }, [walking])
-
-  const distance = rssiToDistance(lastFiltered)
-  const inside = distance <= radius
+  const inside = latest?.status !== "exit"
   const safe = monitoringOn && inside
   const breach = monitoringOn && !inside
-  const pct = monitoringOn ? Math.min(1, distance / (radius * 1.6)) : 0
-
-  const wasInside = useRef(true)
-  useEffect(() => {
-    if (monitoringOn && wasInside.current && !inside) {
-      onTriggerAlert(active, distance)
-    }
-    wasInside.current = inside
-  }, [inside, monitoringOn])
+  const pct = monitoringOn ? (inside ? 0.15 : 1) : 0
 
   const bannerBg = breach ? "bg-coral" : safe ? "bg-mint" : "bg-gray-400"
   const markColor = breach ? "bg-coral" : safe ? "bg-mint" : "bg-gray-300"
@@ -594,31 +540,22 @@ function LiveMapScreen({
 
         <div className="absolute bottom-3 left-3 rounded-2xl bg-white/85 px-3 py-2 backdrop-blur">
           <p className="text-[11px] font-semibold text-gray-500">
-            내 비콘 거리
+            마지막 수신 신호
           </p>
           <p
             className={`text-2xl font-extrabold tabular-nums ${
               breach ? "text-coral-dark" : "text-navy"
             }`}
           >
-            {monitoringOn ? distance.toFixed(1) : "–"}
-            <span className="text-sm">m</span>
+            {monitoringOn && latest?.rssi != null ? latest.rssi : "–"}
+            <span className="text-sm"> dBm</span>
           </p>
         </div>
 
         <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1.5 backdrop-blur">
-          <Icon
-            name={walking ? "walk" : "pause"}
-            className={`h-4 w-4 ${
-              walking ? "text-mint-dark" : "text-gray-400"
-            }`}
-          />
-          <span
-            className={`text-xs font-bold ${
-              walking ? "text-mint-dark" : "text-gray-500"
-            }`}
-          >
-            {walking ? "걷는 중" : "정지 상태"}
+          <Icon name="signal" className="h-4 w-4 text-mint-dark" />
+          <span className="text-xs font-bold text-gray-500">
+            {latest?.receiver ?? "신호 대기"}
           </span>
         </div>
 
@@ -725,19 +662,6 @@ function LiveMapScreen({
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-1.5 pt-1">
-        <button
-          onMouseDown={() => setWalking(true)}
-          onMouseUp={() => setWalking(false)}
-          onMouseLeave={() => setWalking(false)}
-          onTouchStart={() => setWalking(true)}
-          onTouchEnd={() => setWalking(false)}
-          className="flex items-center gap-1.5 rounded-full bg-gray-100 px-4 py-2 text-xs font-bold text-gray-600 transition active:scale-95"
-        >
-          <Icon name="walk" className="h-4 w-4" />
-          {walking ? "멀어지는 중…" : "이탈 시뮬레이션 (길게 누르기)"}
-        </button>
-      </div>
     </div>
   )
 }
@@ -1338,14 +1262,21 @@ function MenuPage({ page, onClose }: { page: string; onClose: () => void }) {
   )
 }
 
-const NOTIFS = [
-  { icon: "route", tone: "coral", title: "평소 경로 이탈 감지", body: "평소 이동 경로를 80% 이상 벗어났습니다.", ts: "5분 전" },
-  { icon: "gift", tone: "mint", title: "안심 리워드 적립", body: "실종자 찾기 제보로 +500P가 적립됐어요.", ts: "오늘 14:20" },
-  { icon: "megaphone", tone: "coral", title: "실종경보 수신", body: "성동구 실종아동 발생 · 주변 안심 스캔이 켜졌어요.", ts: "오늘 13:02" },
-  { icon: "alert", tone: "mint", title: "안전반경 복귀", body: `${PROTECTED.name} 님이 안전반경 안으로 돌아왔어요.`, ts: "어제 18:40" },
-]
+const fmtTs = (ts: string) =>
+  new Date(ts).toLocaleString("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 
-function NotificationPanel({ onClose }: { onClose: () => void }) {
+function NotificationPanel({
+  events,
+  onClose,
+}: {
+  events: EventRow[]
+  onClose: () => void
+}) {
   return (
     <div className="absolute inset-0 z-40 flex justify-end">
       <div
@@ -1363,33 +1294,44 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
           </button>
         </header>
         <div className="flex-1 space-y-2.5 overflow-y-auto p-4">
-          {NOTIFS.map((n, i) => (
-            <div
-              key={i}
-              className="flex gap-3 rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100"
-            >
-              <span
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
-                  n.tone === "coral"
-                    ? "bg-coral-light text-coral-dark"
-                    : "bg-mint-light text-mint-dark"
-                }`}
+          {events.length === 0 && (
+            <p className="py-10 text-center text-sm text-gray-400">
+              아직 알림이 없어요
+            </p>
+          )}
+          {events.map((e) => {
+            const out = e.status === "exit"
+            return (
+              <div
+                key={e.id}
+                className="flex gap-3 rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100"
               >
-                <Icon name={n.icon} className="h-5 w-5" />
-              </span>
-              <div className="flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-bold text-navy">{n.title}</p>
-                  <span className="shrink-0 text-[10px] text-gray-400">
-                    {n.ts}
-                  </span>
+                <span
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                    out
+                      ? "bg-coral-light text-coral-dark"
+                      : "bg-mint-light text-mint-dark"
+                  }`}
+                >
+                  <Icon name={out ? "alert" : "check"} className="h-5 w-5" />
+                </span>
+                <div className="flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-bold text-navy">
+                      {out ? "안전반경 이탈" : "안전반경 복귀"}
+                    </p>
+                    <span className="shrink-0 text-[10px] text-gray-400">
+                      {fmtTs(e.ts)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                    {e.subject} 님이 {out ? "안전반경을 벗어났어요" : "안전반경 안으로 돌아왔어요"}
+                    {e.receiver ? ` · ${e.receiver}` : ""}
+                  </p>
                 </div>
-                <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
-                  {n.body}
-                </p>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
@@ -1410,10 +1352,8 @@ export default function App() {
   const [radius, setRadius] = useState(30)
   const [points, setPoints] = useState(3500)
   const [relayOn, setRelayOn] = useState(true)
-  const [activeAlert, setActiveAlert] = useState<{
-    core: Core
-    distance: number
-  } | null>(null)
+  const [events, setEvents] = useState<EventRow[]>([])
+  const [activeAlert, setActiveAlert] = useState<EventRow | null>(null)
   const [patternAlert, setPatternAlert] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -1434,6 +1374,32 @@ export default function App() {
     setPoints((p) => p + 500)
     setRewards((prev) => [reward(`r${Date.now()}`, "방금", "현재 위치 인근"), ...prev])
   }
+
+  useEffect(() => {
+    supabase
+      .from("events")
+      .select("*")
+      .order("ts", { ascending: false })
+      .limit(20)
+      .then(({ data }) => data && setEvents(data))
+
+    const channel = supabase
+      .channel("events-feed")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "events" },
+        ({ new: row }) => {
+          const e = row as EventRow
+          setEvents((prev) => [e, ...prev].slice(0, 20))
+          if (e.status === "exit") setActiveAlert(e)
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
 
   const goLive = () => {
     setActiveAlert(null)
@@ -1481,7 +1447,7 @@ export default function App() {
               setRadius={setRadius}
               cores={cores}
               setCores={setCores}
-              onTriggerAlert={(core, distance) => setActiveAlert({ core, distance })}
+              latest={events[0]}
               relayOn={relayOn}
               setRelayOn={setRelayOn}
             />
@@ -1534,8 +1500,7 @@ export default function App() {
         {/* 모달 & 오버레이 */}
         {activeAlert && (
           <AlertModal
-            core={activeAlert.core}
-            distance={activeAlert.distance}
+            event={activeAlert}
             radius={radius}
             onClose={() => setActiveAlert(null)}
             onViewLocation={goLive}
@@ -1577,7 +1542,9 @@ export default function App() {
           <MenuPage page={menuPage} onClose={() => setMenuPage(null)} />
         )}
 
-        {notifOpen && <NotificationPanel onClose={() => setNotifOpen(false)} />}
+        {notifOpen && (
+          <NotificationPanel events={events} onClose={() => setNotifOpen(false)} />
+        )}
       </div>
     </div>
   )
