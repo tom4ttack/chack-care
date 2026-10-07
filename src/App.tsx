@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { supabase, type EventRow } from "./lib/supabase"
 import { useBeaconStatus, type BeaconStatus } from "./lib/useBeaconStatus"
+import GuardianMap from "./GuardianMap"
 
 /* ============================================================
    착케어 (ChakCare) — 실종·분실 방지 스마트 앱
@@ -134,7 +135,8 @@ function BatteryBadge({
         배터리 확인 중
       </span>
     )
-  return <BatteryBar level={batteryPercent(s.battery_mv)} showText={false} />
+  const bar = <BatteryBar level={batteryPercent(s.battery_mv)} showText={false} />
+  return onDark ? <div className="rounded-lg bg-white/90 px-2 py-1">{bar}</div> : bar
 }
 
 function SignalBars({ rssi }: { rssi: number | null | undefined }) {
@@ -485,10 +487,8 @@ function LiveMapScreen({
   const inside = latest?.status !== "exit"
   const safe = monitoringOn && inside
   const breach = monitoringOn && !inside
-  const pct = monitoringOn ? (inside ? 0.15 : 1) : 0
 
   const bannerBg = breach ? "bg-coral" : safe ? "bg-mint" : "bg-gray-400"
-  const markColor = breach ? "bg-coral" : safe ? "bg-mint" : "bg-gray-300"
 
   function toggleCore(id: string) {
     setCores((prev) =>
@@ -538,64 +538,12 @@ function LiveMapScreen({
       )}
 
       <div className="relative aspect-square overflow-hidden rounded-3xl ring-1 ring-gray-200">
-        <MapSvg stroke="#D9ECEA" width={9}>
-          <circle
-            cx="200"
-            cy="210"
-            r={radius === 15 ? 78 : 118}
-            fill={breach ? "#F0706016" : "#2A9D8F14"}
-            stroke={breach ? "#F07060" : "#2A9D8F"}
-            strokeWidth="2"
-            strokeDasharray="7 6"
-          />
-        </MapSvg>
-
-        <div
-          className="absolute flex h-11 w-11 items-center justify-center rounded-full bg-white text-navy shadow-md"
-          style={{
-            left: "50%",
-            top: "52.5%",
-            transform: "translate(-50%,-50%)",
-          }}
-        >
-          <Icon name="phone" className="h-5 w-5" />
-          {monitoringOn && (
-            <span
-              className={`animate-pulse-ring absolute h-full w-full rounded-full ${
-                breach ? "bg-coral/40" : "bg-mint/40"
-              }`}
-            />
-          )}
-        </div>
-
-        <div
-          className="absolute transition-all duration-700 ease-out"
-          style={{
-            left: "50%",
-            top: "52.5%",
-            transform: `translate(calc(-50% + ${pct * 110}px), calc(-50% - ${pct * 70}px))`,
-          }}
-        >
-          <div
-            className={`flex h-9 w-9 items-center justify-center rounded-full text-white shadow-lg ${markColor}`}
-          >
-            <Icon name="person" className="h-5 w-5" />
-          </div>
-        </div>
-
-        {relayOn &&
-          [
-            { l: "26%", t: "30%" },
-            { l: "72%", t: "40%" },
-            { l: "64%", t: "74%" },
-            { l: "33%", t: "70%" },
-          ].map((p, i) => (
-            <div
-              key={i}
-              className="animate-scan absolute h-3 w-3 rounded-full bg-coral ring-4 ring-coral/25"
-              style={{ left: p.l, top: p.t, animationDelay: `${i * 0.35}s` }}
-            />
-          ))}
+        <GuardianMap
+          receiverName={latest?.receiver ?? "3층출입구"}
+          radius={radius}
+          breach={breach}
+          monitoringOn={monitoringOn}
+        />
 
         <div className="absolute bottom-3 left-3 rounded-2xl bg-white/85 px-3 py-2 backdrop-blur">
           <p className="text-[11px] font-semibold text-gray-500">
@@ -617,13 +565,11 @@ function LiveMapScreen({
 
         <div className="absolute bottom-3 right-3 space-y-1 rounded-2xl bg-white/85 px-3 py-2 text-[10px] backdrop-blur">
           <p className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-mint" /> 내 비콘
+            <span className="h-2 w-2 rounded-full bg-[#2563EB]" /> 내 위치
           </p>
-          {relayOn && (
-            <p className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-coral" /> 주변 실종 비콘
-            </p>
-          )}
+          <p className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-mint" /> 수신 구역(대략)
+          </p>
         </div>
       </div>
 
