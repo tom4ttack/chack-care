@@ -1409,6 +1409,8 @@ export default function App() {
           const e = row as EventRow
           setEvents((prev) => [e, ...prev].slice(0, 20))
           if (e.status === "exit") setActiveAlert(e)
+          if (e.status === "present")
+            setActiveAlert((a) => (a?.subject === e.subject ? null : a))
         },
       )
       .subscribe()
