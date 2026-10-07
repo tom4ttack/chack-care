@@ -90,10 +90,10 @@ export default function GuardianMap({
     if (receiver) {
       const color = breach ? "#9AA5A4" : "#2A9D8F"
       const label = !monitoringOn
-        ? "수신 구역(대략)"
+        ? "수신 구역"
         : breach
-          ? "마지막 확인 구역(대략)"
-          : "비콘 수신 구역(대략)"
+          ? "마지막 확인 구역"
+          : "비콘 수신 구역"
       if (!zone.current) {
         zone.current = L.circle([receiver.lat, receiver.lng], { radius })
           .bindTooltip(label, { direction: "top", sticky: true })
@@ -131,22 +131,35 @@ export default function GuardianMap({
   }
 
   return (
-    <>
-      <div ref={el} className="absolute inset-0 isolate" />
-      <button
-        onClick={saveReceiver}
-        disabled={!guardian}
-        className="absolute left-3 top-3 z-10 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-bold text-mint-dark shadow backdrop-blur transition active:scale-95 disabled:text-gray-400"
-      >
-        {saved ? "저장됨" : "여기를 수신기 위치로 지정"}
-      </button>
-      {(geoError || (!guardian && !receiver)) && (
-        <p className="absolute inset-x-6 top-14 z-10 rounded-xl bg-white/90 px-3 py-2 text-center text-[11px] text-gray-500 backdrop-blur">
-          {geoError
-            ? "위치 권한을 허용하면 내 위치가 지도에 보여요"
-            : "내 위치를 찾는 중..."}
+    <div className="space-y-1.5">
+      <div className="relative aspect-square overflow-hidden rounded-3xl ring-1 ring-gray-200">
+        <div ref={el} className="absolute inset-0 isolate" />
+        <button
+          onClick={saveReceiver}
+          disabled={!guardian}
+          aria-label="현재 위치를 수신기 위치로 지정"
+          title="현재 위치를 수신기 위치로 지정"
+          className={`absolute bottom-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded-full shadow backdrop-blur transition active:scale-90 disabled:opacity-40 ${
+            saved ? "bg-mint text-white" : "bg-white/90 text-mint-dark"
+          }`}
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+            {saved ? (
+              <path d="M5 12.5l4.5 4.5L19 7" />
+            ) : (
+              <>
+                <path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z" />
+                <circle cx="12" cy="10" r="2.5" />
+              </>
+            )}
+          </svg>
+        </button>
+      </div>
+      {geoError && (
+        <p className="px-1 text-[11px] text-gray-400">
+          위치 권한을 허용하면 내 위치가 지도에 보여요
         </p>
       )}
-    </>
+    </div>
   )
 }

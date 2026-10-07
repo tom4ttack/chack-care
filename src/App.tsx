@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { supabase, type EventRow } from "./lib/supabase"
 import { useBeaconStatus, type BeaconStatus } from "./lib/useBeaconStatus"
 import GuardianMap from "./GuardianMap"
@@ -10,10 +10,9 @@ import GuardianMap from "./GuardianMap"
 type Core = {
   id: string
   name: string
-  battery: number
   connected: boolean
   monitoring: boolean
-  subject?: string
+  subject: string
 }
 
 type Reward = { id: string; ts: string; label: string; area: string; points: number }
@@ -86,7 +85,7 @@ function Icon({ name, className = "h-5 w-5" }: { name: string; className?: strin
 
 /* ---------- 공통 컴포넌트 ---------- */
 
-function BatteryBar({ level, showText = true }: { level: number; showText?: boolean }) {
+function BatteryBar({ level }: { level: number }) {
   const color =
     level >= 70 ? "bg-mint" : level >= 30 ? "bg-[#F2BE55]" : "bg-coral"
   return (
@@ -98,11 +97,6 @@ function BatteryBar({ level, showText = true }: { level: number; showText?: bool
         />
         <div className="absolute -right-0.75 top-1/2 h-1.5 w-0.5 -translate-y-1/2 rounded-r bg-gray-500/60" />
       </div>
-      {showText && (
-        <span className="text-xs font-semibold tabular-nums text-gray-700">
-          {level}%
-        </span>
-      )}
     </div>
   )
 }
@@ -127,7 +121,6 @@ function BatteryBadge({
   beacons: Record<string, BeaconStatus>
   onDark?: boolean
 }) {
-  if (!core.subject) return <BatteryBar level={core.battery} />
   const s = beacons[core.subject]
   if (!s)
     return (
@@ -135,7 +128,7 @@ function BatteryBadge({
         배터리 확인 중
       </span>
     )
-  const bar = <BatteryBar level={batteryPercent(s.battery_mv)} showText={false} />
+  const bar = <BatteryBar level={batteryPercent(s.battery_mv)} />
   return onDark ? <div className="rounded-lg bg-white/90 px-2 py-1">{bar}</div> : bar
 }
 
@@ -340,10 +333,85 @@ function AlertModal({
   )
 }
 
+type Person = {
+  subject: string
+  relation?: string
+  core: Core
+  last?: EventRow
+  monitoring: boolean
+  breach: boolean
+}
+
+function buildPeople(cores: Core[], events: EventRow[]): Person[] {
+  const subjects = [...new Set(cores.map((c) => c.subject))]
+  return subjects
+    .map((subject) => {
+      const mine = cores.filter((c) => c.subject === subject)
+      const last = events.find((e) => e.subject === subject && e.status !== "low_battery")
+      const monitoring = mine.some((c) => c.connected && c.monitoring)
+      return {
+        subject,
+        relation: subject === PROTECTED.name ? PROTECTED.relation : undefined,
+        core: mine[0],
+        last,
+        monitoring,
+        breach: monitoring && last?.status === "exit",
+      }
+    })
+    .sort((a, b) => Number(b.breach) - Number(a.breach))
+}
+
+const toneBg = (p: Person) => (p.breach ? "bg-coral" : p.monitoring ? "bg-mint" : "bg-gray-400")
+const statusText = (p: Person) => (p.breach ? "이탈 감지" : p.monitoring ? "안심 · 반경 내" : "모니터링 꺼짐")
+const personLabel = (p: Person) => (p.relation ? `${p.subject} · ${p.relation}` : p.subject)
+
+function PeopleCarousel({
+  people,
+  children,
+}: {
+  people: Person[]
+  children: (p: Person) => React.ReactNode
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [index, setIndex] = useState(0)
+  const first = people[0]
+
+  useEffect(() => {
+    ref.current?.scrollTo({ left: 0, behavior: "smooth" })
+  }, [first?.subject, first?.breach])
+
+  return (
+    <div>
+      <div
+        ref={ref}
+        onScroll={(e) => setIndex(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
+        className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {people.map((p) => (
+          <div key={p.subject} className="w-full shrink-0 snap-center">
+            {children(p)}
+          </div>
+        ))}
+      </div>
+      {people.length > 1 && (
+        <div className="mt-2 flex justify-center gap-1.5">
+          {people.map((p, n) => (
+            <span
+              key={p.subject}
+              className={`h-1.5 rounded-full transition-all ${n === index ? "w-4 bg-mint" : "w-1.5 bg-gray-300"}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ---------- 0) 홈 화면 ---------- */
 
 function HomeScreen({
   cores,
+  people,
   beacons,
   radius,
   points,
@@ -351,6 +419,7 @@ function HomeScreen({
   onGo,
 }: {
   cores: Core[]
+  people: Person[]
   beacons: Record<string, BeaconStatus>
   radius: number
   points: number
@@ -360,39 +429,39 @@ function HomeScreen({
   const connected = cores.filter((c) => c.connected).length
   return (
     <div className="space-y-5">
-      <div className="relative overflow-hidden rounded-3xl bg-mint p-6 text-white">
-        <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10" />
-        <div className="absolute right-6 top-8 h-24 w-24 rounded-full bg-white/10" />
-        <div className="relative flex items-center gap-4">
-          <div className="relative">
-            <div className="h-16 w-16 rounded-2xl border-2 border-white/60 bg-gray-200" />
-            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-white">
-              <span className="block h-2 w-2 rounded-full bg-mint" />
-            </span>
-          </div>
-          <div>
-            <p className="text-sm font-medium opacity-90">
-              김서준 · 아들 · 만 8세
-            </p>
-            <p className="text-2xl font-extrabold tracking-tight">
-              안심 · 반경 내
-            </p>
-          </div>
-        </div>
-
-        <div className="relative mt-5 grid grid-cols-3 gap-2 text-center">
-          {[
-            { k: "연결 코어", v: `${connected}/${cores.length}` },
-            { k: "안전반경", v: `${radius}m` },
-            { k: "안심 스캔", v: relayOn ? "ON" : "OFF" },
-          ].map((s) => (
-            <div key={s.k} className="rounded-2xl bg-white/15 py-2.5">
-              <p className="text-[11px] opacity-80">{s.k}</p>
-              <p className="text-base font-extrabold">{s.v}</p>
+      <PeopleCarousel people={people}>
+        {(p) => (
+          <div className={`relative overflow-hidden rounded-3xl p-6 text-white transition-colors ${toneBg(p)}`}>
+            <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10" />
+            <div className="absolute right-6 top-8 h-24 w-24 rounded-full bg-white/10" />
+            <div className="relative flex items-center gap-4">
+              <div className="relative">
+                <div className="h-16 w-16 rounded-2xl border-2 border-white/60 bg-gray-200" />
+                <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-white">
+                  <span className={`block h-2 w-2 rounded-full ${p.breach ? "bg-coral" : "bg-mint"}`} />
+                </span>
+              </div>
+              <div>
+                <p className="text-sm font-medium opacity-90">{personLabel(p)}</p>
+                <p className="text-2xl font-extrabold tracking-tight">{statusText(p)}</p>
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
+
+            <div className="relative mt-5 grid grid-cols-3 gap-2 text-center">
+              {[
+                { k: "연결 코어", v: `${connected}/${cores.length}` },
+                { k: "안전반경", v: `${radius}m` },
+                { k: "안심 스캔", v: relayOn ? "ON" : "OFF" },
+              ].map((s) => (
+                <div key={s.k} className="rounded-2xl bg-white/15 py-2.5">
+                  <p className="text-[11px] opacity-80">{s.k}</p>
+                  <p className="text-base font-extrabold">{s.v}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </PeopleCarousel>
 
       <div className="grid grid-cols-3 gap-2.5">
         {[
@@ -462,33 +531,27 @@ function HomeScreen({
 /* ---------- 1) 지오펜스 라이브 지도 ---------- */
 
 function LiveMapScreen({
+  people,
   beacons,
   radius,
   setRadius,
   cores,
   setCores,
-  latest,
   relayOn,
   setRelayOn,
 }: {
+  people: Person[]
   beacons: Record<string, BeaconStatus>
   radius: number
   setRadius: (r: number) => void
   cores: Core[]
   setCores: React.Dispatch<React.SetStateAction<Core[]>>
-  latest?: EventRow
   relayOn: boolean
   setRelayOn: (v: boolean) => void
 }) {
-  const monitored = cores.filter((c) => c.connected && c.monitoring)
-  const monitoringOn = monitored.length > 0
-  const active = monitored[0] ?? cores.find((c) => c.connected) ?? cores[0]
-
-  const inside = latest?.status !== "exit"
-  const safe = monitoringOn && inside
-  const breach = monitoringOn && !inside
-
-  const bannerBg = breach ? "bg-coral" : safe ? "bg-mint" : "bg-gray-400"
+  const monitoringOn = people.some((p) => p.monitoring)
+  const breach = people.some((p) => p.breach)
+  const top = people[0]
 
   function toggleCore(id: string) {
     setCores((prev) =>
@@ -498,27 +561,25 @@ function LiveMapScreen({
 
   return (
     <div className="space-y-5">
-      <div
-        className={`flex items-center gap-3 rounded-3xl p-4 text-white transition-colors ${bannerBg}`}
-      >
-        <div className="h-12 w-12 rounded-2xl border-2 border-white/60 bg-gray-200" />
-        <div className="flex-1">
-          <p className="text-xs opacity-90">
-            {PROTECTED.name} · {PROTECTED.relation}
-          </p>
-          <p className="text-lg font-extrabold">
-            {breach ? "이탈 감지" : safe ? "안심 · 반경 내" : "모니터링 꺼짐"}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-[11px] opacity-80">디바이스</p>
-          <BatteryBadge core={active} beacons={beacons} onDark />
-        </div>
-      </div>
+      <PeopleCarousel people={people}>
+        {(p) => (
+          <div className={`flex items-center gap-3 rounded-3xl p-4 text-white transition-colors ${toneBg(p)}`}>
+            <div className="h-12 w-12 rounded-2xl border-2 border-white/60 bg-gray-200" />
+            <div className="flex-1">
+              <p className="text-xs opacity-90">{personLabel(p)}</p>
+              <p className="text-lg font-extrabold">{statusText(p)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[11px] opacity-80">디바이스</p>
+              <BatteryBadge core={p.core} beacons={beacons} onDark />
+            </div>
+          </div>
+        )}
+      </PeopleCarousel>
 
       <SectionTitle
         title="라이브 지도"
-        sub={monitoringOn ? (inside ? "반경 내" : "이탈") : "꺼짐"}
+        sub={monitoringOn ? (breach ? "이탈" : "반경 내") : "꺼짐"}
       />
 
       {relayOn && (
@@ -537,39 +598,18 @@ function LiveMapScreen({
         </div>
       )}
 
-      <div className="relative aspect-square overflow-hidden rounded-3xl ring-1 ring-gray-200">
+      <div className="space-y-2">
         <GuardianMap
-          receiverName={latest?.receiver ?? "3층출입구"}
+          receiverName={top?.last?.receiver ?? "3층출입구"}
           radius={radius}
           breach={breach}
           monitoringOn={monitoringOn}
         />
-
-        <div className="absolute bottom-3 left-3 rounded-2xl bg-white/85 px-3 py-2 backdrop-blur">
-          <p className="text-[11px] font-semibold text-gray-500">
-            수신 신호
-          </p>
-          <p
-            className={`mt-1 ${breach ? "text-coral-dark" : "text-navy"}`}
-          >
-            <SignalBars rssi={monitoringOn ? latest?.rssi : null} />
-          </p>
-        </div>
-
-        <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1.5 backdrop-blur">
-          <Icon name="signal" className="h-4 w-4 text-mint-dark" />
-          <span className="text-xs font-bold text-gray-500">
-            {latest?.receiver ?? "신호 대기"}
+        <div className="flex items-center justify-between px-1 text-xs text-gray-500">
+          <span>수신 신호</span>
+          <span className={breach ? "text-coral-dark" : "text-navy"}>
+            <SignalBars rssi={monitoringOn ? top?.last?.rssi : null} />
           </span>
-        </div>
-
-        <div className="absolute bottom-3 right-3 space-y-1 rounded-2xl bg-white/85 px-3 py-2 text-[10px] backdrop-blur">
-          <p className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-[#2563EB]" /> 내 위치
-          </p>
-          <p className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-mint" /> 수신 구역(대략)
-          </p>
         </div>
       </div>
 
@@ -1363,9 +1403,11 @@ export default function App() {
   const [menuPage, setMenuPage] = useState<null | string>(null)
 
   const [cores, setCores] = useState<Core[]>([
-    { id: "c1", name: "착코어 A", battery: 82, connected: true, monitoring: true, subject: PROTECTED.name },
-    { id: "c2", name: "착코어 B", battery: 34, connected: true, monitoring: false },
+    { id: "c1", name: "착코어 A", connected: true, monitoring: true, subject: PROTECTED.name },
+    { id: "c2", name: "착코어 B", connected: true, monitoring: true, subject: "김민수" },
   ])
+
+  const people = buildPeople(cores, events)
 
   const [rewards, setRewards] = useState<Reward[]>([
     reward("r1", "오늘 14:20", "성수동 2가"),
@@ -1441,6 +1483,7 @@ export default function App() {
         <main className="flex-1 overflow-y-auto px-5 py-5">
           {tab === "home" && (
             <HomeScreen
+              people={people}
               beacons={beacons}
               cores={cores}
               radius={radius}
@@ -1451,12 +1494,12 @@ export default function App() {
           )}
           {tab === "live" && (
             <LiveMapScreen
+              people={people}
               beacons={beacons}
               radius={radius}
               setRadius={setRadius}
               cores={cores}
               setCores={setCores}
-              latest={events.find((e) => e.status !== "low_battery")}
               relayOn={relayOn}
               setRelayOn={setRelayOn}
             />
