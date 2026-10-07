@@ -85,9 +85,9 @@ function Icon({ name, className = "h-5 w-5" }: { name: string; className?: strin
 
 /* ---------- 공통 컴포넌트 ---------- */
 
-function BatteryBar({ level }: { level: number }) {
+function BatteryBar({ level, showText = true }: { level: number; showText?: boolean }) {
   const color =
-    level > 50 ? "bg-mint" : level > 20 ? "bg-[#F2BE55]" : "bg-coral"
+    level >= 70 ? "bg-mint" : level >= 30 ? "bg-[#F2BE55]" : "bg-coral"
   return (
     <div className="flex items-center gap-2">
       <div className="relative h-3.5 w-7 rounded-[3px] border-[1.5px] border-gray-500/60">
@@ -97,17 +97,13 @@ function BatteryBar({ level }: { level: number }) {
         />
         <div className="absolute -right-0.75 top-1/2 h-1.5 w-0.5 -translate-y-1/2 rounded-r bg-gray-500/60" />
       </div>
-      <span className="text-xs font-semibold tabular-nums text-gray-700">
-        {level}%
-      </span>
+      {showText && (
+        <span className="text-xs font-semibold tabular-nums text-gray-700">
+          {level}%
+        </span>
+      )}
     </div>
   )
-}
-
-const LEVEL = {
-  ok: { label: "정상", dot: "bg-mint", text: "text-mint-dark" },
-  warn: { label: "주의", dot: "bg-[#F2BE55]", text: "text-gray-700" },
-  low: { label: "교체 필요", dot: "bg-coral", text: "text-coral-dark" },
 }
 
 const BATTERY_CURVE = [[3000, 100], [2900, 75], [2800, 45], [2700, 20], [2600, 10], [2500, 5], [2000, 0]]
@@ -138,19 +134,7 @@ function BatteryBadge({
         배터리 확인 중
       </span>
     )
-  const l = LEVEL[s.level]
-  const mins = Math.max(0, Math.round((Date.now() - new Date(s.updated_at).getTime()) / 60000))
-  return (
-    <div className="text-right">
-      <p className={`flex items-center justify-end gap-1.5 text-xs font-bold ${onDark ? "" : l.text}`}>
-        <span className={`h-2 w-2 rounded-full ${onDark ? "bg-white" : l.dot}`} />
-        {l.label} · {batteryPercent(s.battery_mv)}%
-      </p>
-      <p className={`text-[10px] ${onDark ? "opacity-80" : "text-gray-400"}`}>
-        {(s.battery_mv / 1000).toFixed(2)}V · {mins}분 전
-      </p>
-    </div>
-  )
+  return <BatteryBar level={batteryPercent(s.battery_mv)} showText={false} />
 }
 
 function SignalBars({ rssi }: { rssi: number | null | undefined }) {
