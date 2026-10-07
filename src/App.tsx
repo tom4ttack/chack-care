@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { supabase, type EventRow } from "./lib/supabase"
 import { useBeaconStatus, type BeaconStatus } from "./lib/useBeaconStatus"
 import GuardianMap from "./GuardianMap"
+import { recordAction, useAlertActions, type ActionKind } from "./lib/useAlertActions"
 
 /* ============================================================
    착케어 (ChakCare) — 실종·분실 방지 스마트 앱
@@ -220,6 +221,7 @@ function AlertSheet({
   sub,
   vibrate,
   confirm,
+  dismissLabel = "해제",
   onClose,
   onConfirm,
   children,
@@ -229,6 +231,7 @@ function AlertSheet({
   sub: string
   vibrate: number[]
   confirm: string
+  dismissLabel?: string
   onClose: () => void
   onConfirm: () => void
   children: React.ReactNode
@@ -261,7 +264,7 @@ function AlertSheet({
               onClick={onClose}
               className="flex-1 rounded-2xl bg-gray-100 py-3.5 text-sm font-bold text-gray-700 transition active:scale-[.98]"
             >
-              해제
+              {dismissLabel}
             </button>
             <button
               onClick={onConfirm}
@@ -300,6 +303,7 @@ function AlertModal({
       sub={`${event.subject} · ${event.receiver ?? "수신기"}`}
       vibrate={[400, 200, 400, 200, 600]}
       confirm="확인"
+      dismissLabel="이상 없음"
       onClose={onClose}
       onConfirm={onViewLocation}
     >
@@ -1318,11 +1322,56 @@ const EVENT_UI = {
   low_battery: { icon: "bell", title: "배터리 교체 필요", body: "의 착코어 배터리가 얼마 남지 않았어요", tone: "bg-coral-light text-coral-dark" },
 }
 
+const ACTION_LABEL: Record<ActionKind, string> = {
+  acknowledged: "확인함",
+  resolved: "처리 완료",
+  false_alarm: "이상 없음",
+}
+
+const isReturned = (e: EventRow, events: EventRow[]) =>
+  events.some((x) => x.subject === e.subject && x.status === "present" && x.id > e.id)
+
+function ExitActions({
+  e,
+  done,
+  returned,
+  onAction,
+}: {
+  e: EventRow
+  done?: ActionKind
+  returned: boolean
+  onAction: (eventId: number, action: ActionKind) => void
+}) {
+  const closed = done === "resolved" || done === "false_alarm"
+  const chip = done ? ACTION_LABEL[done] : returned ? "자동 복귀" : "미확인"
+  const chipTone = done || returned ? "bg-gray-100 text-gray-600" : "bg-coral-light text-coral-dark"
+  const next: ActionKind = done === "acknowledged" ? "resolved" : "acknowledged"
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${chipTone}`}>{chip}</span>
+      {!closed &&
+        [next, "false_alarm" as const].map((a) => (
+          <button
+            key={a}
+            onClick={() => onAction(e.id, a)}
+            className="rounded-full bg-mint-light px-2.5 py-0.5 text-[11px] font-bold text-mint-dark transition active:scale-95"
+          >
+            {ACTION_LABEL[a]}
+          </button>
+        ))}
+    </div>
+  )
+}
+
 function NotificationPanel({
   events,
+  actions,
+  onAction,
   onClose,
 }: {
   events: EventRow[]
+  actions: Record<number, ActionKind>
+  onAction: (eventId: number, action: ActionKind) => void
   onClose: () => void
 }) {
   return (
@@ -1370,6 +1419,9 @@ function NotificationPanel({
                     {e.subject} 님{k.body}
                     {e.receiver ? ` · ${e.receiver}` : ""}
                   </p>
+                  {e.status === "exit" && (
+                    <ExitActions e={e} done={actions[e.id]} returned={isReturned(e, events)} onAction={onAction} />
+                  )}
                 </div>
               </div>
             )
@@ -1395,6 +1447,7 @@ export default function App() {
   const [points, setPoints] = useState(3500)
   const [relayOn, setRelayOn] = useState(true)
   const beacons = useBeaconStatus()
+  const actions = useAlertActions()
   const [events, setEvents] = useState<EventRow[]>([])
   const [activeAlert, setActiveAlert] = useState<EventRow | null>(null)
   const [patternAlert, setPatternAlert] = useState(false)
@@ -1473,7 +1526,7 @@ export default function App() {
             className="relative flex h-9 w-9 items-center justify-center rounded-xl text-navy transition active:scale-90 active:bg-gray-100"
           >
             <Icon name="bell" className="h-6 w-6" />
-            {events.length > 0 && (
+            {events.some((e) => e.status === "exit" && !actions[e.id] && !isReturned(e, events)) && (
               <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-coral ring-2 ring-white" />
             )}
           </button>
@@ -1554,8 +1607,14 @@ export default function App() {
           <AlertModal
             event={activeAlert}
             radius={radius}
-            onClose={() => setActiveAlert(null)}
-            onViewLocation={goLive}
+            onClose={() => {
+              recordAction(activeAlert.id, "false_alarm")
+              setActiveAlert(null)
+            }}
+            onViewLocation={() => {
+              recordAction(activeAlert.id, "acknowledged")
+              goLive()
+            }}
           />
         )}
 
@@ -1595,7 +1654,12 @@ export default function App() {
         )}
 
         {notifOpen && (
-          <NotificationPanel events={events} onClose={() => setNotifOpen(false)} />
+          <NotificationPanel
+            events={events}
+            actions={actions}
+            onAction={recordAction}
+            onClose={() => setNotifOpen(false)}
+          />
         )}
       </div>
     </div>
