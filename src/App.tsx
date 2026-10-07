@@ -537,39 +537,18 @@ function LiveMapScreen({
         </div>
       )}
 
-      <div className="relative aspect-square overflow-hidden rounded-3xl ring-1 ring-gray-200">
+      <div className="space-y-2">
         <GuardianMap
           receiverName={latest?.receiver ?? "3층출입구"}
           radius={radius}
           breach={breach}
           monitoringOn={monitoringOn}
         />
-
-        <div className="absolute bottom-3 left-3 rounded-2xl bg-white/85 px-3 py-2 backdrop-blur">
-          <p className="text-[11px] font-semibold text-gray-500">
-            수신 신호
-          </p>
-          <p
-            className={`mt-1 ${breach ? "text-coral-dark" : "text-navy"}`}
-          >
+        <div className="flex items-center justify-between px-1 text-xs text-gray-500">
+          <span>수신 신호</span>
+          <span className={breach ? "text-coral-dark" : "text-navy"}>
             <SignalBars rssi={monitoringOn ? latest?.rssi : null} />
-          </p>
-        </div>
-
-        <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1.5 backdrop-blur">
-          <Icon name="signal" className="h-4 w-4 text-mint-dark" />
-          <span className="text-xs font-bold text-gray-500">
-            {latest?.receiver ?? "신호 대기"}
           </span>
-        </div>
-
-        <div className="absolute bottom-3 right-3 space-y-1 rounded-2xl bg-white/85 px-3 py-2 text-[10px] backdrop-blur">
-          <p className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-[#2563EB]" /> 내 위치
-          </p>
-          <p className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-mint" /> 수신 구역
-          </p>
         </div>
       </div>
 
@@ -1364,7 +1343,7 @@ export default function App() {
 
   const [cores, setCores] = useState<Core[]>([
     { id: "c1", name: "착코어 A", battery: 82, connected: true, monitoring: true, subject: PROTECTED.name },
-    { id: "c2", name: "착코어 B", battery: 34, connected: true, monitoring: false },
+    { id: "c2", name: "착코어 B", battery: 34, connected: true, monitoring: false, subject: "김민수" },
   ])
 
   const [rewards, setRewards] = useState<Reward[]>([
