@@ -303,7 +303,7 @@ function AlertModal({
       sub={`${event.subject} · ${event.receiver ?? "수신기"}`}
       vibrate={[400, 200, 400, 200, 600]}
       confirm="확인"
-      dismissLabel="오경보"
+      dismissLabel="이상 없음"
       onClose={onClose}
       onConfirm={onViewLocation}
     >
@@ -1325,7 +1325,7 @@ const EVENT_UI = {
 const ACTION_LABEL: Record<ActionKind, string> = {
   acknowledged: "확인함",
   resolved: "처리 완료",
-  false_alarm: "오탐",
+  false_alarm: "이상 없음",
 }
 
 const isReturned = (e: EventRow, events: EventRow[]) =>
