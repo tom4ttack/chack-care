@@ -568,7 +568,7 @@ function LiveMapScreen({
             <span className="h-2 w-2 rounded-full bg-[#2563EB]" /> 내 위치
           </p>
           <p className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-mint" /> 수신 구역(대략)
+            <span className="h-2 w-2 rounded-full bg-mint" /> 수신 구역
           </p>
         </div>
       </div>

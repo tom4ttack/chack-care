@@ -90,10 +90,10 @@ export default function GuardianMap({
     if (receiver) {
       const color = breach ? "#9AA5A4" : "#2A9D8F"
       const label = !monitoringOn
-        ? "수신 구역(대략)"
+        ? "수신 구역"
         : breach
-          ? "마지막 확인 구역(대략)"
-          : "비콘 수신 구역(대략)"
+          ? "마지막 확인 구역"
+          : "비콘 수신 구역"
       if (!zone.current) {
         zone.current = L.circle([receiver.lat, receiver.lng], { radius })
           .bindTooltip(label, { direction: "top", sticky: true })
