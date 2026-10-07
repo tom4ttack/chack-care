@@ -110,6 +110,17 @@ const LEVEL = {
   low: { label: "교체 필요", dot: "bg-coral", text: "text-coral-dark" },
 }
 
+const BATTERY_CURVE = [[3000, 100], [2900, 75], [2800, 45], [2700, 20], [2600, 10], [2500, 5], [2000, 0]]
+
+function batteryPercent(mv: number) {
+  if (mv >= 3000) return 100
+  const i = BATTERY_CURVE.findIndex(([v]) => mv >= v)
+  if (i < 0) return 0
+  const [v0, p0] = BATTERY_CURVE[i - 1]
+  const [v1, p1] = BATTERY_CURVE[i]
+  return Math.round((p1 + ((mv - v1) / (v0 - v1)) * (p0 - p1)) / 10) * 10
+}
+
 function BatteryBadge({
   core,
   beacons,
@@ -133,9 +144,11 @@ function BatteryBadge({
     <div className="text-right">
       <p className={`flex items-center justify-end gap-1.5 text-xs font-bold ${onDark ? "" : l.text}`}>
         <span className={`h-2 w-2 rounded-full ${onDark ? "bg-white" : l.dot}`} />
-        {l.label} · {(s.battery_mv / 1000).toFixed(2)}V
+        {l.label} · {batteryPercent(s.battery_mv)}%
       </p>
-      <p className={`text-[10px] ${onDark ? "opacity-80" : "text-gray-400"}`}>{mins}분 전</p>
+      <p className={`text-[10px] ${onDark ? "opacity-80" : "text-gray-400"}`}>
+        {(s.battery_mv / 1000).toFixed(2)}V · {mins}분 전
+      </p>
     </div>
   )
 }
