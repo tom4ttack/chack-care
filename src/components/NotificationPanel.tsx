@@ -25,6 +25,12 @@ const ACTION_LABEL: Record<ActionKind, string> = {
 export const isReturned = (e: EventRow, events: EventRow[]) =>
   events.some((x) => x.subject === e.subject && x.status === "present" && x.id > e.id)
 
+export const isOpen = (e: EventRow, events: EventRow[], actions: Record<number, ActionKind>) =>
+  e.status === "exit" &&
+  !isReturned(e, events) &&
+  actions[e.id] !== "resolved" &&
+  actions[e.id] !== "false_alarm"
+
 function ExitActions({
   e,
   done,
@@ -61,11 +67,13 @@ export function NotificationPanel({
   events,
   actions,
   onAction,
+  onClear,
   onClose,
 }: {
   events: EventRow[]
   actions: Record<number, ActionKind>
   onAction: (eventId: number, action: ActionKind) => void
+  onClear?: () => void
   onClose: () => void
 }) {
   return (
@@ -77,12 +85,22 @@ export function NotificationPanel({
       <div className="animate-slide-up relative flex h-full w-[86%] max-w-85 flex-col bg-gray-50 shadow-2xl">
         <header className="flex items-center justify-between border-b border-gray-100 bg-white/90 px-5 py-3.5 backdrop-blur">
           <p className="text-base font-extrabold text-navy">알림</p>
-          <button
-            onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition active:scale-90 active:bg-gray-100"
-          >
-            <Icon name="close" className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {onClear && (
+              <button
+                onClick={onClear}
+                className="rounded-xl px-3 py-1.5 text-sm font-bold text-gray-500 transition active:scale-95 active:bg-gray-100"
+              >
+                지우기
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition active:scale-90 active:bg-gray-100"
+            >
+              <Icon name="close" className="h-5 w-5" />
+            </button>
+          </div>
         </header>
         <div className="flex-1 space-y-2.5 overflow-y-auto p-4">
           {events.length === 0 && (
