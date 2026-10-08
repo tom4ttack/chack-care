@@ -26,7 +26,6 @@ export default function GuardianMap({
   const fitted = useRef(false)
 
   const [guardian, setGuardian] = useState<Pos | null>(null)
-  const [geoError, setGeoError] = useState(false)
   const [receiver, setReceiver] = useState<Pos | null>(null)
   const [saved, setSaved] = useState(false)
 
@@ -49,13 +48,10 @@ export default function GuardianMap({
   }, [])
 
   useEffect(() => {
-    if (!navigator.geolocation) return setGeoError(true)
+    if (!navigator.geolocation) return
     const id = navigator.geolocation.watchPosition(
-      (p) => {
-        setGeoError(false)
-        setGuardian({ lat: p.coords.latitude, lng: p.coords.longitude })
-      },
-      () => setGeoError(true),
+      (p) => setGuardian({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      undefined,
       { enableHighAccuracy: true },
     )
     return () => navigator.geolocation.clearWatch(id)
@@ -131,35 +127,28 @@ export default function GuardianMap({
   }
 
   return (
-    <div className="space-y-1.5">
-      <div className="relative aspect-square overflow-hidden rounded-3xl ring-1 ring-gray-200">
-        <div ref={el} className="absolute inset-0 isolate" />
-        <button
-          onClick={saveReceiver}
-          disabled={!guardian}
-          aria-label="현재 위치를 수신기 위치로 지정"
-          title="현재 위치를 수신기 위치로 지정"
-          className={`absolute bottom-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded-full shadow backdrop-blur transition active:scale-90 disabled:opacity-40 ${
-            saved ? "bg-mint text-white" : "bg-white/90 text-mint-dark"
-          }`}
-        >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-            {saved ? (
-              <path d="M5 12.5l4.5 4.5L19 7" />
-            ) : (
-              <>
-                <path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z" />
-                <circle cx="12" cy="10" r="2.5" />
-              </>
-            )}
-          </svg>
-        </button>
-      </div>
-      {geoError && (
-        <p className="px-1 text-[11px] text-gray-400">
-          위치 권한을 허용하면 내 위치가 지도에 보여요
-        </p>
-      )}
+    <div className="relative aspect-square overflow-hidden rounded-3xl ring-1 ring-gray-200">
+      <div ref={el} className="absolute inset-0 isolate" />
+      <button
+        onClick={saveReceiver}
+        disabled={!guardian}
+        aria-label="현재 위치를 수신기 위치로 지정"
+        title="현재 위치를 수신기 위치로 지정"
+        className={`absolute bottom-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded-full shadow backdrop-blur transition active:scale-90 disabled:opacity-40 ${
+          saved ? "bg-mint text-white" : "bg-white/90 text-mint-dark"
+        }`}
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          {saved ? (
+            <path d="M5 12.5l4.5 4.5L19 7" />
+          ) : (
+            <>
+              <path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z" />
+              <circle cx="12" cy="10" r="2.5" />
+            </>
+          )}
+        </svg>
+      </button>
     </div>
   )
 }
