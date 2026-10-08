@@ -74,18 +74,18 @@ export function LiveMapScreen({
       )}
 
       <div className="space-y-2">
-        <GuardianMap
-          receiverName={top?.last?.receiver ?? "3층출입구"}
-          radius={radius}
-          breach={breach}
-          monitoringOn={monitoringOn}
-        />
         <div className="flex items-center justify-between px-1 text-xs text-gray-500">
           <span>수신 신호</span>
           <span className={breach ? "text-coral-dark" : "text-navy"}>
             <SignalBars rssi={monitoringOn ? top?.last?.rssi : null} />
           </span>
         </div>
+        <GuardianMap
+          receiverName={top?.last?.receiver ?? "3층출입구"}
+          radius={radius}
+          breach={breach}
+          monitoringOn={monitoringOn}
+        />
       </div>
 
       <div className="flex items-center gap-3 rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100">
