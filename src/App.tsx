@@ -7,7 +7,7 @@ import { PROTECTED, reward } from "./data"
 import { Icon } from "./components/Icon"
 import { AlertSheet, AlertModal } from "./components/AlertModal"
 import { buildPeople } from "./components/PeopleCarousel"
-import { isReturned, NotificationPanel } from "./components/NotificationPanel"
+import { isOpen, isReturned, NotificationPanel } from "./components/NotificationPanel"
 import { HomeScreen } from "./screens/HomeScreen"
 import { LiveMapScreen } from "./screens/LiveMapScreen"
 import { ReportScreen } from "./screens/ReportScreen"
@@ -41,6 +41,23 @@ export default function App() {
   ])
 
   const people = buildPeople(cores, events)
+
+  const [cleared, setCleared] = useState<number[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("chakcare.cleared") ?? "[]")
+    } catch {
+      return []
+    }
+  })
+  const visible = events.filter((e) => !cleared.includes(e.id))
+  const clearable = visible.filter((e) => !isOpen(e, visible, actions)).map((e) => e.id)
+  const clearNotifs = () => {
+    const next = [...cleared, ...clearable]
+    try {
+      localStorage.setItem("chakcare.cleared", JSON.stringify(next))
+    } catch {}
+    setCleared(next)
+  }
 
   const [rewards, setRewards] = useState<Reward[]>([
     reward("r1", "오늘 14:20", "성수동 2가"),
@@ -235,9 +252,10 @@ export default function App() {
 
         {notifOpen && (
           <NotificationPanel
-            events={events}
+            events={visible}
             actions={actions}
             onAction={recordAction}
+            onClear={clearable.length ? clearNotifs : undefined}
             onClose={() => setNotifOpen(false)}
           />
         )}
