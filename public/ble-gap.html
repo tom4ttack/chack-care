@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BLE 수신 측정</title>
+<style>
+body{font:16px/1.5 system-ui,sans-serif;margin:16px;max-width:560px}
+button{font:inherit;padding:10px 14px;margin:4px 4px 4px 0;border-radius:10px;border:1px solid #2A9D8F;background:#fff}
+button.p{background:#2A9D8F;color:#fff}
+pre{background:#f3f3f1;padding:10px;border-radius:8px;overflow:auto;font-size:13px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<h1>BLE 수신 측정</h1>
+<p>안드로이드 크롬 전용. chrome://flags 에서 "Experimental Web Platform features"를 켜고 크롬을 다시 시작한 뒤 사용하세요. 측정 중에는 화면을 켜 두세요.</p>
+<button class="p" id="go">측정 시작</button>
+<button id="m1" disabled>구간: 책상 위</button>
+<button id="m2" disabled>구간: 착용</button>
+<button id="stop" disabled>종료·결과</button>
+<p id="st">대기 중</p>
+<pre id="out"></pre>
+<button id="dl" hidden>CSV 저장</button>
+<button id="cp" hidden>CSV 복사</button>
+<script>
+const UUID = "e2c56db5dffb48d2b060d0f5a71096e0";
+const $ = (id) => document.getElementById(id);
+const rows = [], last = {}, maxGap = {};
+let t0, timer, wake;
+
+function onAd(e) {
+  const t = Date.now();
+  e.manufacturerData.forEach((dv) => {
+    const b = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+    const hex = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+    const i = hex.indexOf(UUID);
+    if (i < 0 || i % 2) return;
+    const j = (i + 32) / 2;
+    const minor = b[j + 2] * 256 + b[j + 3];
+    rows.push({ t, minor, rssi: e.rssi });
+    if (last[minor]) maxGap[minor] = Math.max(maxGap[minor] || 0, t - last[minor]);
+    last[minor] = t;
+  });
+}
+
+function tick() {
+  const now = Date.now();
+  const lines = Object.keys(last).map((m) => `minor ${m}: 신호 ${rows.filter((r) => r.minor == m).length}건 · 무수신 ${((now - last[m]) / 1000).toFixed(0)}초 · 최대 끊김 ${((maxGap[m] || 0) / 1000).toFixed(0)}초`);
+  $("st").textContent = `측정 중 ${Math.floor((now - t0) / 1000)}초`;
+  $("out").textContent = lines.join("\n") || "신호 대기 중...";
+}
+
+const pct = (a, p) => a[Math.floor((a.length - 1) * p)];
+
+function report() {
+  const marks = rows.filter((r) => r.mark);
+  const bounds = [{ name: "전체", from: t0, to: Date.now() }];
+  if (marks.length) {
+    bounds.length = 0;
+    marks.forEach((m, k) => bounds.push({ name: m.mark, from: m.t, to: marks[k + 1] ? marks[k + 1].t : Date.now() }));
+  }
+  const out = [];
+  bounds.forEach((s) => {
+    [...new Set(rows.filter((r) => r.minor !== undefined).map((r) => r.minor))].forEach((m) => {
+      const ts = rows.filter((r) => r.minor === m && r.t >= s.from && r.t <= s.to).map((r) => r.t);
+      const g = ts.slice(1).map((t, i) => (t - ts[i]) / 1000).filter((x) => x >= 0.05).sort((a, b) => a - b);
+      if (!g.length) return;
+      out.push(`[${s.name}] minor ${m}: 신호 ${ts.length}건, 끊김 중앙 ${pct(g, 0.5).toFixed(1)}s · p95 ${pct(g, 0.95).toFixed(1)}s · 최대 ${g[g.length - 1].toFixed(1)}s · 10초↑ ${g.filter((x) => x >= 10).length} · 30초↑ ${g.filter((x) => x >= 30).length}`);
+    });
+  });
+  return out.join("\n") || "수신된 신호가 없습니다.";
+}
+
+const csv = () => "epoch_ms,iso,minor,rssi,marker\n" + rows.map((r) => `${r.t},${new Date(r.t).toISOString()},${r.minor ?? ""},${r.rssi ?? ""},${r.mark ?? ""}`).join("\n");
+
+$("go").onclick = async () => {
+  try {
+    await navigator.bluetooth.requestLEScan({ acceptAllAdvertisements: true });
+    navigator.bluetooth.addEventListener("advertisementreceived", onAd);
+    try { wake = await navigator.wakeLock.request("screen"); } catch {}
+    t0 = Date.now();
+    rows.length = 0;
+    timer = setInterval(tick, 1000);
+    ["go"].forEach((i) => ($(i).disabled = true));
+    ["m1", "m2", "stop"].forEach((i) => ($(i).disabled = false));
+  } catch (err) {
+    $("st").textContent = "시작 실패: " + err.message + " (플래그, 블루투스, 위치 권한을 확인하세요)";
+  }
+};
+$("m1").onclick = () => rows.push({ t: Date.now(), mark: "책상 위" });
+$("m2").onclick = () => rows.push({ t: Date.now(), mark: "착용" });
+$("stop").onclick = () => {
+  clearInterval(timer);
+  navigator.bluetooth.removeEventListener("advertisementreceived", onAd);
+  wake?.release();
+  $("st").textContent = "종료";
+  $("out").textContent = report();
+  $("dl").hidden = $("cp").hidden = false;
+};
+$("dl").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv()], { type: "text/csv" }));
+  a.download = "ble-gap.csv";
+  a.click();
+};
+$("cp").onclick = () => navigator.clipboard.writeText(csv());
+</script>
+</body>
+</html>
