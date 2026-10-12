@@ -23,11 +23,19 @@ pre{background:#f3f3f1;padding:10px;border-radius:8px;overflow:auto;font-size:13
 <pre id="out"></pre>
 <button id="dl" hidden>CSV 저장</button>
 <button id="cp" hidden>CSV 복사</button>
+<button id="old" hidden>이전 측정 기록 불러오기</button>
 <script>
 const UUID = "e2c56db5dffb48d2b060d0f5a71096e0";
 const $ = (id) => document.getElementById(id);
 const rows = [], last = {}, maxGap = {};
-let t0, timer, wake;
+let t0, timer, wake, restarts = 0, restartTimer, saveTimer;
+const devs = [];
+
+async function watch(d) {
+  d.ctl?.abort();
+  d.ctl = new AbortController();
+  await d.watchAdvertisements({ signal: d.ctl.signal });
+}
 
 function onAd(e) {
   const t = Date.now();
@@ -47,7 +55,7 @@ function onAd(e) {
 function tick() {
   const now = Date.now();
   const lines = Object.keys(last).map((m) => `minor ${m}: 신호 ${rows.filter((r) => r.minor == m).length}건 · 무수신 ${((now - last[m]) / 1000).toFixed(0)}초 · 최대 끊김 ${((maxGap[m] || 0) / 1000).toFixed(0)}초`);
-  $("st").textContent = `측정 중 ${Math.floor((now - t0) / 1000)}초`;
+  $("st").textContent = `측정 중 ${Math.floor((now - t0) / 1000)}초 · 재시작 ${restarts}회`;
   $("out").textContent = lines.join("\n") || "신호 대기 중...";
 }
 
@@ -79,6 +87,8 @@ function begin() {
   t0 = Date.now();
   rows.length = 0;
   timer = setInterval(tick, 1000);
+  restartTimer = setInterval(() => { devs.forEach((d) => watch(d).catch(() => {})); restarts++; }, 120000);
+  saveTimer = setInterval(() => localStorage.setItem("ble-rows", JSON.stringify(rows)), 5000);
   ["m1", "m2", "stop"].forEach((i) => ($(i).disabled = false));
   navigator.wakeLock?.request("screen").then((w) => (wake = w), () => {});
 }
@@ -97,7 +107,8 @@ $("add").onclick = async () => {
   try {
     const d = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalManufacturerData: [0x4c, 0x4458] });
     d.addEventListener("advertisementreceived", onAd);
-    await d.watchAdvertisements();
+    await watch(d);
+    devs.push(d);
     begin();
     $("st").textContent = "비콘 추가됨. 두 번째 비콘도 같은 방법으로 추가하세요.";
   } catch (err) {
@@ -110,6 +121,8 @@ $("m1").onclick = () => rows.push({ t: Date.now(), mark: "책상 위" });
 $("m2").onclick = () => rows.push({ t: Date.now(), mark: "착용" });
 $("stop").onclick = () => {
   clearInterval(timer);
+  clearInterval(restartTimer);
+  clearInterval(saveTimer);
   navigator.bluetooth.removeEventListener("advertisementreceived", onAd);
   wake?.release();
   $("st").textContent = "종료";
@@ -121,6 +134,13 @@ $("dl").onclick = () => {
   a.href = URL.createObjectURL(new Blob([csv()], { type: "text/csv" }));
   a.download = "ble-gap.csv";
   a.click();
+};
+if (localStorage.getItem("ble-rows")) $("old").hidden = false;
+$("old").onclick = () => {
+  rows.length = 0;
+  rows.push(...JSON.parse(localStorage.getItem("ble-rows")));
+  $("out").textContent = report();
+  $("dl").hidden = $("cp").hidden = false;
 };
 $("cp").onclick = () => navigator.clipboard.writeText(csv());
 </script>
