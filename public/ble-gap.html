@@ -15,6 +15,7 @@ pre{background:#f3f3f1;padding:10px;border-radius:8px;overflow:auto;font-size:13
 <h1>BLE 수신 측정</h1>
 <p>안드로이드 크롬 전용. chrome://flags 에서 "Experimental Web Platform features"를 켜고 크롬을 다시 시작한 뒤 사용하세요. 측정 중에는 화면을 켜 두세요.</p>
 <button class="p" id="go">측정 시작</button>
+<button id="add">비콘 선택(대안)</button>
 <button id="m1" disabled>구간: 책상 위</button>
 <button id="m2" disabled>구간: 착용</button>
 <button id="stop" disabled>종료·결과</button>
@@ -73,20 +74,38 @@ function report() {
 
 const csv = () => "epoch_ms,iso,minor,rssi,marker\n" + rows.map((r) => `${r.t},${new Date(r.t).toISOString()},${r.minor ?? ""},${r.rssi ?? ""},${r.mark ?? ""}`).join("\n");
 
+function begin() {
+  if (t0) return;
+  t0 = Date.now();
+  rows.length = 0;
+  timer = setInterval(tick, 1000);
+  ["m1", "m2", "stop"].forEach((i) => ($(i).disabled = false));
+  navigator.wakeLock?.request("screen").then((w) => (wake = w), () => {});
+}
+
 $("go").onclick = async () => {
   try {
     await navigator.bluetooth.requestLEScan({ acceptAllAdvertisements: true });
     navigator.bluetooth.addEventListener("advertisementreceived", onAd);
-    try { wake = await navigator.wakeLock.request("screen"); } catch {}
-    t0 = Date.now();
-    rows.length = 0;
-    timer = setInterval(tick, 1000);
-    $("go").disabled = true;
-    ["m1", "m2", "stop"].forEach((i) => ($(i).disabled = false));
+    begin();
   } catch (err) {
-    $("st").textContent = "시작 실패: " + err.message + " (플래그, 블루투스, 위치 권한을 확인하세요)";
+    $("st").textContent = "시작 실패: " + err.message + " → '비콘 선택(대안)'을 눌러 보세요";
   }
 };
+
+$("add").onclick = async () => {
+  try {
+    const d = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalManufacturerData: [0x4c, 0x4458] });
+    d.addEventListener("advertisementreceived", onAd);
+    await d.watchAdvertisements();
+    begin();
+    $("st").textContent = "비콘 추가됨. 두 번째 비콘도 같은 방법으로 추가하세요.";
+  } catch (err) {
+    $("st").textContent = "선택 실패: " + err.message;
+  }
+};
+
+navigator.bluetooth?.getAvailability().then((a) => ($("st").textContent = `블루투스 사용 가능: ${a} · 스캔 지원: ${typeof navigator.bluetooth.requestLEScan === "function"}`));
 $("m1").onclick = () => rows.push({ t: Date.now(), mark: "책상 위" });
 $("m2").onclick = () => rows.push({ t: Date.now(), mark: "착용" });
 $("stop").onclick = () => {
