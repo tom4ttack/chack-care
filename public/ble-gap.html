@@ -81,7 +81,7 @@ $("go").onclick = async () => {
     t0 = Date.now();
     rows.length = 0;
     timer = setInterval(tick, 1000);
-    ["go"].forEach((i) => ($(i).disabled = true));
+    $("go").disabled = true;
     ["m1", "m2", "stop"].forEach((i) => ($(i).disabled = false));
   } catch (err) {
     $("st").textContent = "시작 실패: " + err.message + " (플래그, 블루투스, 위치 권한을 확인하세요)";
