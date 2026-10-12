@@ -226,9 +226,9 @@ export default function App() {
             onConfirm={goLive}
           >
             <p className="text-center text-xl font-extrabold text-navy">
-              평소 이동 경로를
+              <span className="text-coral-dark">평소 이동 경로</span>를
               <br />
-              <span className="text-coral-dark">80% 이상</span> 벗어났습니다
+              벗어났습니다
             </p>
             <p className="rounded-2xl bg-coral-light px-4 py-3 text-center text-[13px] leading-relaxed text-coral-dark">
               평소 가지 않던 방향으로 이동하고 있어요. 위치를 확인해 주세요.
