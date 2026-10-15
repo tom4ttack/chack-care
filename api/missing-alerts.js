@@ -22,7 +22,14 @@ export default async function handler(req, res) {
         detailDate2: day(new Date()),
       }),
     })
-    const d = await r.json()
+    const raw = await r.text()
+    let d
+    try {
+      d = JSON.parse(raw)
+    } catch {
+      // JSON이 아니면(차단 페이지 등) 상태와 앞부분을 돌려줘 원인을 볼 수 있게 한다
+      return res.status(502).json({ error: "not-json", status: r.status, head: raw.replace(/\s+/g, " ").slice(0, 400) })
+    }
     if (d.result !== "00") return res.status(502).json({ error: d.result, msg: d.msg })
 
     // 하루 호출 한도(1,000건)를 아끼려고 5분 캐시
