@@ -320,7 +320,7 @@ alter publication supabase_realtime add table public.alert_actions;
 | `screens/ReportScreen.tsx` 전체 | 행동반경 지도, 자주 머무는 곳, 시간대별 안전 구역 |
 | `screens/RewardScreen.tsx`, `App.tsx`의 `rewards`, `points` | 리워드 내역, 포인트 3,500 |
 | `screens/MenuPages.tsx` | 프로필(김보호, 연락처), 구독, 자사몰 |
-| `screens/LiveMapScreen.tsx` | "[실종경보] 성동구 실종아동" 배너 |
+| `screens/LiveMapScreen.tsx` | "[실종경보 예시] 성동구 실종아동" 배너 — 경찰청 인증키가 있으면 실제 실종경보(`api/missing-alerts.js`)로 바뀌고 "자료 출처: 경찰청"이 붙는다 |
 
 ---
 
@@ -461,6 +461,7 @@ pnpm build                              # 배포용 빌드 테스트
 3. `main`에 합쳐지면 **Vercel이 자동으로 배포**한다 (1~2분). 배포 상태는 Vercel의 Deployments 탭.
 - **PR을 연 뒤에 같은 브랜치에 커밋을 더 올리면, 그 사이에 머지됐을 때 뒷부분이 빠진다.** PR을 열기 전에 끝내거나, 머지된 뒤에는 새 브랜치로 올린다.
 - 배포마다 고유 주소(`chak-care-xxxx.vercel.app`)가 생기는데 **그때 상태로 고정된 사본**이고 로그인 보호가 걸려 있다. 항상 최신인 주소는 `https://chack-care.vercel.app`.
+- 실종경보 연동(`api/missing-alerts.js`)은 Vercel 환경변수 `SAFE182_ESNTL_ID`(고유아이디), `SAFE182_AUTH_KEY`(인증키)가 있어야 동작한다. 경찰청 안전Dream Open API에서 신청해 발급받고, 일 호출 1,000건 한도라 서버에서 5분 캐시한다. 키는 `VITE_`를 붙이지 않는다(붙이면 브라우저에 노출). 로컬 개발(`npm run dev`)에는 `/api`가 없어 예시 문구가 나온다.
 - Vercel 환경변수(`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)는 Project → Settings → Environment Variables. **바꾼 뒤에는 새 배포가 있어야 적용된다** (Deployments → Redeploy).
 - 화면이 안 바뀌면 강력 새로고침(`Ctrl+Shift+R`)부터.
 

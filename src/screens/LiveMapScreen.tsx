@@ -1,5 +1,6 @@
 import GuardianMap from "../GuardianMap"
 import type { BeaconStatus } from "../lib/useBeaconStatus"
+import { useMissingAlert } from "../lib/useMissingAlert"
 import type { Core, Person } from "../types"
 import { Icon } from "../components/Icon"
 import { BatteryBadge, SignalBars, SectionTitle, Toggle } from "../components/ui"
@@ -27,6 +28,7 @@ export function LiveMapScreen({
   const monitoringOn = people.some((p) => p.monitoring)
   const breach = people.some((p) => p.breach)
   const top = people[0]
+  const missing = useMissingAlert(relayOn)
 
   function toggleCore(id: string) {
     setCores((prev) =>
@@ -63,10 +65,15 @@ export function LiveMapScreen({
             <Icon name="megaphone" className="mt-0.5 h-5 w-5 shrink-0" />
             <div className="flex-1">
               <p className="text-sm font-extrabold">
-                [실종경보] 성동구 실종아동 발생
+                {missing ? `[실종경보] ${missing.place} ${missing.target} 발생` : "[실종경보 예시] 성동구 실종아동 발생"}
               </p>
-              <p className="text-xs opacity-90">
-                7세 남아 · 파란 점퍼 · 성수동 인근 · 15:42 최종 확인
+              <p className="line-clamp-2 text-xs opacity-90">
+                {missing
+                  ? [`${missing.age}세 ${missing.sex}`, missing.dress, missing.date].filter(Boolean).join(" · ")
+                  : "7세 남아 · 파란 점퍼 · 성수동 인근 · 15:42 최종 확인"}
+              </p>
+              <p className="mt-0.5 text-[11px] opacity-75">
+                {missing ? "자료 출처: 경찰청" : "예시 데이터"}
               </p>
             </div>
           </div>
