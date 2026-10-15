@@ -42,7 +42,7 @@ export default async function handler(req, res) {
           date: x.occrde.replace(/^(\d{4})(\d{2})(\d{2})/, "$1.$2.$3"),
         })),
     })
-  } catch {
-    res.status(502).json({ error: "fetch-failed" })
+  } catch (e) {
+    res.status(502).json({ error: "fetch-failed", detail: String(e.cause?.code ?? e.message) })
   }
 }
