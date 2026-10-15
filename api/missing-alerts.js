@@ -27,7 +27,7 @@ export default async function handler(req, res) {
         target: TARGET[x.writngTrgetDscd] ?? x.writngTrgetDscd,
         place: x.occrAdres,
         dress: x.alldressingDscd,
-        date: String(x.occrde ?? "").replace(/^(d{4})(d{2})(d{2})/, "$1.$2.$3"),
+        date: String(x.occrde ?? "").replace(/^(\d{4})(\d{2})(\d{2})/, "$1.$2.$3"),
       })),
     })
   } catch {
