@@ -5,7 +5,10 @@ const TARGET = { "010": "아동", "070": "치매환자" } // 060·061·062는 �
 const day = (d) => d.toISOString().slice(0, 10)
 
 export default async function handler(req, res) {
-  const { SAFE182_ESNTL_ID: esntlId, SAFE182_AUTH_KEY: authKey } = process.env
+  // 환경변수에 붙은 공백·줄바꿈·따옴표를 걷어낸다 (붙여넣기 실수 방지)
+  const clean = (v) => v?.trim().replace(/^["']|["']$/g, "")
+  const esntlId = clean(process.env.SAFE182_ESNTL_ID)
+  const authKey = clean(process.env.SAFE182_AUTH_KEY)
   if (!esntlId || !authKey) return res.status(503).json({ error: "no-key" })
 
   try {
@@ -28,7 +31,7 @@ export default async function handler(req, res) {
       d = JSON.parse(raw)
     } catch {
       // JSON이 아니면(차단 페이지 등) 상태와 앞부분을 돌려줘 원인을 볼 수 있게 한다
-      return res.status(502).json({ error: "not-json", status: r.status, head: raw.replace(/\s+/g, " ").slice(0, 400) })
+      return res.status(502).json({ error: "not-json", status: r.status, head: raw.replace(/\s+/g, " ").slice(0, 200), idLen: esntlId.length, keyLen: authKey.length, keyHex: /^[0-9a-f]+$/i.test(authKey) })
     }
     if (d.result !== "00") return res.status(502).json({ error: d.result, msg: d.msg })
 
