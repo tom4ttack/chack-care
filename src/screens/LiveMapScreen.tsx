@@ -69,7 +69,7 @@ export function LiveMapScreen({
               </p>
               <p className="line-clamp-2 text-xs opacity-90">
                 {missing
-                  ? `${missing.age}세 ${missing.sex} · ${missing.dress} · ${missing.date}`
+                  ? [`${missing.age}세 ${missing.sex}`, missing.dress, missing.date].filter(Boolean).join(" · ")
                   : "7세 남아 · 파란 점퍼 · 성수동 인근 · 15:42 최종 확인"}
               </p>
               <p className="mt-0.5 text-[11px] opacity-75">
