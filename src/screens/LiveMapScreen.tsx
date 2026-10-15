@@ -72,9 +72,6 @@ export function LiveMapScreen({
                   ? [`${missing.age}세 ${missing.sex}`, missing.dress, missing.date].filter(Boolean).join(" · ")
                   : "7세 남아 · 파란 점퍼 · 성수동 인근 · 15:42 최종 확인"}
               </p>
-              <p className="mt-0.5 text-[11px] opacity-75">
-                {missing ? "자료 출처: 경찰청" : "예시 데이터"}
-              </p>
             </div>
           </div>
         </div>
@@ -186,6 +183,9 @@ export function LiveMapScreen({
         </div>
       </div>
 
+      {relayOn && missing && (
+        <p className="px-1 text-center text-[11px] text-gray-400">[자료 출처: 경찰청]</p>
+      )}
     </div>
   )
 }
