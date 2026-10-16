@@ -19,7 +19,7 @@ export function buildPeople(cores: Core[], events: EventRow[]): Person[] {
         breach: monitoring && last?.status === "exit",
       }
     })
-    .sort((a, b) => Number(b.breach) - Number(a.breach))
+    .sort((a, b) => Number(b.breach) - Number(a.breach) || Number(b.monitoring) - Number(a.monitoring))
 }
 
 export const toneBg = (p: Person) => (p.breach ? "bg-coral" : p.monitoring ? "bg-mint" : "bg-gray-400")
