@@ -48,6 +48,20 @@ async function post(subject, status, rssi) {
   }
 }
 
+// First sighting: if the server still shows this person as exited (e.g. from an earlier receiver), record the return.
+async function syncFirst(minor, rssi) {
+  const subject = nameOf(minor);
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/events?select=status&subject=eq.${encodeURIComponent(subject)}&order=id.desc&limit=1`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+    });
+    const rows = await r.json();
+    if (rows[0] && rows[0].status === "exit") post(subject, "present", rssi);
+  } catch (e) {
+    lastErr = String(e.message || e);
+  }
+}
+
 function onAd(e) {
   const now = Date.now();
   e.manufacturerData.forEach((dv) => {
@@ -57,8 +71,10 @@ function onAd(e) {
     if (i < 0 || i % 2) return;
     const j = (i + 32) / 2;
     const minor = b[j + 2] * 256 + b[j + 3];
+    const isNew = !tracked[minor];
     const en = tracked[minor] || (tracked[minor] = { last: now, status: "present", rssi: e.rssi, count: 0 });
     en.last = now; en.rssi = e.rssi; en.count++;
+    if (isNew) syncFirst(minor, e.rssi);
     if (en.status === "exit") {
       en.status = "present";
       post(nameOf(minor), "present", e.rssi);
