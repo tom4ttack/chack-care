@@ -17,6 +17,7 @@ pre{background:#f3f3f1;padding:10px;border-radius:8px;overflow:auto;font-size:13
 <h1>착케어 폰 수신기 (백업)</h1>
 <p class="w">PC 게이트웨이를 켠 채로 같이 쓰지 마세요. 둘 다 서버에 기록해서 이탈·재실이 섞입니다. 안드로이드 크롬 전용이고, 크롬이 약 5분 뒤 수신을 멈춥니다. 측정 중에는 화면을 켜 두고 크롬을 맨 앞에 두세요.</p>
 <p>수신기 이름 <input id="rx" value="시연"></p>
+<p>이탈 판정 시간(초) <input id="ex" value="30" size="3" style="width:4em"> 최소 신호(dBm) <input id="mr" placeholder="끔" style="width:5em"><br><small>기본은 30초, 최소 신호 끔입니다. 시연에서 바꾸면 발표에서 바꿨다고 말하세요. 최소 신호는 −65처럼 입력하면 그보다 약한 신호는 수신으로 치지 않습니다.</small></p>
 <button class="p" id="go">수신 시작</button>
 <button id="stop" disabled>정지</button>
 <p id="st">대기 중</p>
@@ -26,7 +27,8 @@ const UUID = "e2c56db5dffb48d2b060d0f5a71096e0";
 const SUPABASE_URL = "https://ujirlznmlekocoibrlsw.supabase.co";
 const SUPABASE_KEY = "sb_publishable_OPleR4A0J51h9ek18CzvXQ_N1NhAWW8";
 const NAMES = { 1: "김서준", 2: "김민수", 3: "박지현" };
-const EXIT_SEC = 30;
+const exitSec = () => Math.max(1, Number($("ex").value) || 30);
+const minRssi = () => { const v = $("mr").value.trim(); return v === "" || isNaN(Number(v)) ? null : Number(v); };
 const $ = (id) => document.getElementById(id);
 const tracked = {}; // minor -> { last, status, rssi, count }
 let t0 = 0, timer = 0, wake = null, sent = 0, failed = 0, lastErr = "";
@@ -71,6 +73,7 @@ function onAd(e) {
     if (i < 0 || i % 2) return;
     const j = (i + 32) / 2;
     const minor = b[j + 2] * 256 + b[j + 3];
+    if (minRssi() !== null && e.rssi < minRssi()) return; // 약한 신호는 수신으로 치지 않음
     const isNew = !tracked[minor];
     const en = tracked[minor] || (tracked[minor] = { last: now, status: "present", rssi: e.rssi, count: 0 });
     en.last = now; en.rssi = e.rssi; en.count++;
@@ -85,13 +88,13 @@ function onAd(e) {
 function tick() {
   const now = Date.now();
   Object.entries(tracked).forEach(([m, en]) => {
-    if (en.status === "present" && now - en.last >= EXIT_SEC * 1000) {
+    if (en.status === "present" && now - en.last >= exitSec() * 1000) {
       en.status = "exit";
       post(nameOf(m), "exit", null);
     }
   });
   const lines = Object.entries(tracked).map(([m, en]) => `${nameOf(m)} (minor ${m}): ${en.status === "present" ? "재실" : "이탈"} · 마지막 신호 ${Math.round((now - en.last) / 1000)}초 전 · RSSI ${en.rssi} · ${en.count}건`);
-  $("st").textContent = `수신 중 ${Math.floor((now - t0) / 1000)}초 · 서버 전송 ${sent}건 · 실패 ${failed}건`;
+  $("st").textContent = `수신 중 ${Math.floor((now - t0) / 1000)}초 · 이탈 ${exitSec()}초${minRssi() !== null ? ` · 최소 ${minRssi()}dBm` : ""} · 서버 전송 ${sent}건 · 실패 ${failed}건`;
   $("out").textContent = (lines.join("\n") || "신호 대기 중...") + (lastErr ? `\n\n마지막 오류: ${lastErr}` : "");
 }
 
