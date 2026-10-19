@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>착케어 폰 수신기 (백업)</title>
+<style>
+body{font:16px/1.5 system-ui,sans-serif;margin:16px;max-width:560px}
+button{font:inherit;padding:10px 14px;margin:4px 4px 4px 0;border-radius:10px;border:1px solid #2A9D8F;background:#fff}
+button.p{background:#2A9D8F;color:#fff}
+input{font:inherit;padding:8px;border:1px solid #ccc;border-radius:8px;width:8em}
+pre{background:#f3f3f1;padding:10px;border-radius:8px;overflow:auto;font-size:13px;white-space:pre-wrap}
+.w{background:#fdeceb;color:#b3382c;padding:8px 10px;border-radius:8px;font-size:14px}
+</style>
+</head>
+<body>
+<h1>착케어 폰 수신기 (백업)</h1>
+<p class="w">PC 게이트웨이를 켠 채로 같이 쓰지 마세요. 둘 다 서버에 기록해서 이탈·재실이 섞입니다. 안드로이드 크롬 전용이고, 크롬이 약 5분 뒤 수신을 멈춥니다. 측정 중에는 화면을 켜 두고 크롬을 맨 앞에 두세요.</p>
+<p>수신기 이름 <input id="rx" value="시연"></p>
+<button class="p" id="go">수신 시작</button>
+<button id="stop" disabled>정지</button>
+<p id="st">대기 중</p>
+<pre id="out"></pre>
+<script>
+const UUID = "e2c56db5dffb48d2b060d0f5a71096e0";
+const SUPABASE_URL = "https://ujirlznmlekocoibrlsw.supabase.co";
+const SUPABASE_KEY = "sb_publishable_OPleR4A0J51h9ek18CzvXQ_N1NhAWW8";
+const NAMES = { 1: "김서준", 2: "김민수", 3: "박지현" };
+const EXIT_SEC = 30;
+const $ = (id) => document.getElementById(id);
+const tracked = {}; // minor -> { last, status, rssi, count }
+let t0 = 0, timer = 0, wake = null, sent = 0, failed = 0, lastErr = "";
+
+const nameOf = (m) => NAMES[m] || `minor-${m}`;
+
+async function post(subject, status, rssi) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/events`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ subject, status, receiver: $("rx").value || "시연", rssi }),
+    });
+    if (r.ok) sent++;
+    else { failed++; lastErr = `${r.status} ${(await r.text()).slice(0, 120)}`; }
+  } catch (e) {
+    failed++;
+    lastErr = String(e.message || e);
+  }
+}
+
+function onAd(e) {
+  const now = Date.now();
+  e.manufacturerData.forEach((dv) => {
+    const b = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+    const hex = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+    const i = hex.indexOf(UUID);
+    if (i < 0 || i % 2) return;
+    const j = (i + 32) / 2;
+    const minor = b[j + 2] * 256 + b[j + 3];
+    const en = tracked[minor] || (tracked[minor] = { last: now, status: "present", rssi: e.rssi, count: 0 });
+    en.last = now; en.rssi = e.rssi; en.count++;
+    if (en.status === "exit") {
+      en.status = "present";
+      post(nameOf(minor), "present", e.rssi);
+    }
+  });
+}
+
+function tick() {
+  const now = Date.now();
+  Object.entries(tracked).forEach(([m, en]) => {
+    if (en.status === "present" && now - en.last >= EXIT_SEC * 1000) {
+      en.status = "exit";
+      post(nameOf(m), "exit", null);
+    }
+  });
+  const lines = Object.entries(tracked).map(([m, en]) => `${nameOf(m)} (minor ${m}): ${en.status === "present" ? "재실" : "이탈"} · 마지막 신호 ${Math.round((now - en.last) / 1000)}초 전 · RSSI ${en.rssi} · ${en.count}건`);
+  $("st").textContent = `수신 중 ${Math.floor((now - t0) / 1000)}초 · 서버 전송 ${sent}건 · 실패 ${failed}건`;
+  $("out").textContent = (lines.join("\n") || "신호 대기 중...") + (lastErr ? `\n\n마지막 오류: ${lastErr}` : "");
+}
+
+$("go").onclick = async () => {
+  try {
+    await navigator.bluetooth.requestLEScan({ acceptAllAdvertisements: true });
+    navigator.bluetooth.addEventListener("advertisementreceived", onAd);
+    if (!t0) { t0 = Date.now(); timer = setInterval(tick, 1000); }
+    $("stop").disabled = false;
+    navigator.wakeLock?.request("screen").then((w) => (wake = w), () => {});
+  } catch (err) {
+    $("st").textContent = "시작 실패: " + err.message + " → chrome://flags 의 'Experimental Web Platform features'를 켰는지 확인하세요";
+  }
+};
+$("stop").onclick = () => {
+  clearInterval(timer);
+  navigator.bluetooth.removeEventListener("advertisementreceived", onAd);
+  wake?.release();
+  t0 = 0;
+  $("stop").disabled = true;
+  $("st").textContent = "정지됨";
+};
+</script>
+</body>
+</html>
