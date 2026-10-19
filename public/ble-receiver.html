@@ -30,6 +30,13 @@ const NAMES = { 1: "김서준", 2: "김민수", 3: "박지현" };
 const exitSec = () => Math.max(1, Number($("ex").value) || 30);
 const minRssi = () => { const v = $("mr").value.trim(); return v === "" || isNaN(Number(v)) ? null : Number(v); };
 const $ = (id) => document.getElementById(id);
+// optional presets from the address, e.g. ble-receiver.html?ex=10&mr=-62&rx=시연
+{
+  const q = new URLSearchParams(location.search);
+  if (q.get("ex")) $("ex").value = q.get("ex");
+  if (q.get("mr")) $("mr").value = q.get("mr");
+  if (q.get("rx")) $("rx").value = q.get("rx");
+}
 const tracked = {}; // minor -> { last, status, rssi, count }
 let t0 = 0, timer = 0, wake = null, sent = 0, failed = 0, lastErr = "";
 
