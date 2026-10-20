@@ -86,7 +86,7 @@ export function MenuPage({ page, onClose }: { page: string; onClose: () => void 
                 <p className="text-lg font-extrabold text-navy">김서준</p>
                 <p className="text-sm text-gray-500">아들 · 만 8세</p>
                 <p className="mt-1 text-xs text-mint-dark">
-                  착코어 A · B 연결됨
+                  착코어 서준 · 민수 연결됨
                 </p>
               </div>
             </div>
@@ -111,7 +111,7 @@ export function MenuPage({ page, onClose }: { page: string; onClose: () => void 
                 ["구독 상태", "프리미엄 케어"],
                 ["다음 결제일", "2026.09.15"],
                 ["누적 안심 제보", "27회"],
-                ["최근 주문", "착코어 B · 배송완료"],
+                ["최근 주문", "착코어 민수 · 배송완료"],
               ]}
             />
           </div>
