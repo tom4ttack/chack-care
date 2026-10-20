@@ -49,6 +49,12 @@ export default function GuardianMap({
 
   useEffect(() => {
     if (!navigator.geolocation) return
+    // 실내에서는 정밀(GPS) 위치가 늦거나 안 와서 버튼이 안 켜지므로, 네트워크 기반 대략 위치를 먼저 받는다
+    navigator.geolocation.getCurrentPosition(
+      (p) => setGuardian((g) => g ?? { lat: p.coords.latitude, lng: p.coords.longitude }),
+      undefined,
+      { maximumAge: 60000, timeout: 10000 },
+    )
     const id = navigator.geolocation.watchPosition(
       (p) => setGuardian({ lat: p.coords.latitude, lng: p.coords.longitude }),
       undefined,
