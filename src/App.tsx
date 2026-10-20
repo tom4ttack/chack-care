@@ -36,8 +36,8 @@ export default function App() {
   const [menuPage, setMenuPage] = useState<null | string>(null)
 
   const [cores, setCores] = useState<Core[]>([
-    { id: "c1", name: "착코어 A", connected: true, monitoring: true, subject: PROTECTED.name },
-    { id: "c2", name: "착코어 B", connected: true, monitoring: true, subject: "김민수" },
+    { id: "c1", name: "착코어 서준", connected: true, monitoring: true, subject: PROTECTED.name },
+    { id: "c2", name: "착코어 민수", connected: true, monitoring: true, subject: "김민수" },
   ])
 
   const people = buildPeople(cores, events)
@@ -136,6 +136,7 @@ export default function App() {
               people={people}
               beacons={beacons}
               cores={cores}
+              setCores={setCores}
               radius={radius}
               points={points}
               relayOn={relayOn}

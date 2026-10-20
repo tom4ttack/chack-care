@@ -1,11 +1,12 @@
 import type { BeaconStatus } from "../lib/useBeaconStatus"
 import type { Core, TabKey, Person } from "../types"
 import { Icon } from "../components/Icon"
-import { BatteryBadge, SectionTitle } from "../components/ui"
+import { BatteryBadge, SectionTitle, Toggle } from "../components/ui"
 import { toneBg, statusText, personLabel, PeopleCarousel } from "../components/PeopleCarousel"
 
 export function HomeScreen({
   cores,
+  setCores,
   people,
   beacons,
   radius,
@@ -14,6 +15,7 @@ export function HomeScreen({
   onGo,
 }: {
   cores: Core[]
+  setCores: React.Dispatch<React.SetStateAction<Core[]>>
   people: Person[]
   beacons: Record<string, BeaconStatus>
   radius: number
@@ -94,11 +96,18 @@ export function HomeScreen({
                 <div>
                   <p className="text-sm font-bold text-navy">{c.name}</p>
                   <p className="text-xs text-gray-500">
-                    {c.connected ? "연결됨" : "연결 끊김"}
+                    {!c.connected ? "연결 끊김" : c.monitoring ? "이탈 알림 켜짐" : "이탈 알림 꺼짐"}
                   </p>
                 </div>
               </div>
-              <BatteryBadge core={c} beacons={beacons} />
+              <div className="flex items-center gap-3">
+                <BatteryBadge core={c} beacons={beacons} />
+                <Toggle
+                  checked={c.connected && c.monitoring}
+                  onChange={() => setCores((prev) => prev.map((x) => (x.id === c.id ? { ...x, monitoring: !x.monitoring } : x)))}
+                  disabled={!c.connected}
+                />
+              </div>
             </div>
           ))}
         </div>
