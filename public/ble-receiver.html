@@ -17,7 +17,7 @@ pre{background:#f3f3f1;padding:10px;border-radius:8px;overflow:auto;font-size:13
 <h1>착케어 폰 수신기 (백업)</h1>
 <p class="w">PC 게이트웨이를 켠 채로 같이 쓰지 마세요. 둘 다 서버에 기록해서 이탈·재실이 섞입니다. 안드로이드 크롬 전용이고, 크롬이 약 5분 뒤 수신을 멈춥니다. 측정 중에는 화면을 켜 두고 크롬을 맨 앞에 두세요.</p>
 <p>수신기 이름 <input id="rx" value="시연"></p>
-<p>이탈 판정 시간(초) <input id="ex" value="30" size="3" style="width:4em"> 최소 신호(dBm) <input id="mr" placeholder="끔" style="width:5em"><br><small>기본은 30초, 최소 신호 끔입니다. 시연에서 바꾸면 발표에서 바꿨다고 말하세요. 최소 신호는 −65처럼 입력하면 그보다 약한 신호는 수신으로 치지 않습니다.</small></p>
+<p>이탈 판정 시간(초) <input id="ex" value="6" size="3" style="width:4em"> 최소 신호(dBm) <input id="mr" value="-70" placeholder="끔" style="width:5em"><br><small>시연용 기본값은 6초, −70dBm입니다(수정 가능, 비우면 최소 신호 끔). 실제 기준은 30초이니, 시연에서 줄였다고 발표에서 말하세요. 최소 신호는 −65처럼 입력하면 그보다 약한 신호는 수신으로 치지 않습니다.</small></p>
 <button class="p" id="go">수신 시작</button>
 <button id="stop" disabled>정지</button>
 <p id="st">대기 중</p>
